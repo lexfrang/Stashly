@@ -23,6 +23,7 @@ public class AuthActivity extends AppCompatActivity {
     
     private FirebaseAuth mAuth;
     private boolean isFirebaseAvailable = false;
+    private boolean isSignUpMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,7 +64,11 @@ public class AuthActivity extends AppCompatActivity {
             mSignInButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    handleEmailPasswordSignIn();
+                    if (isSignUpMode) {
+                        handleSignUp();
+                    } else {
+                        handleEmailPasswordSignIn();
+                    }
                 }
             });
         }
@@ -81,9 +86,20 @@ public class AuthActivity extends AppCompatActivity {
             mSignUpText.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    Toast.makeText(AuthActivity.this, "Sign up is pre-configured. Use Guest Mode! \u26A1", Toast.LENGTH_LONG).show();
+                    toggleAuthMode();
                 }
             });
+        }
+    }
+
+    private void toggleAuthMode() {
+        isSignUpMode = !isSignUpMode;
+        if (isSignUpMode) {
+            mSignInButton.setText("Sign Up");
+            mSignUpText.setText("Already have an account? Sign In");
+        } else {
+            mSignInButton.setText("Sign In");
+            mSignUpText.setText("Don't have an account? Sign Up");
         }
     }
 
@@ -128,6 +144,40 @@ public class AuthActivity extends AppCompatActivity {
             // Local fallback simulation
             Toast.makeText(this, "Offline Simulator: Validating Credentials...", Toast.LENGTH_SHORT).show();
             navigateToMain();
+        }
+    }
+
+    private void handleSignUp() {
+        if (mEmailInput == null || mPasswordInput == null) return;
+        
+        String email = mEmailInput.getText().toString().trim();
+        String password = mPasswordInput.getText().toString().trim();
+
+        if (email.isEmpty()) {
+            mEmailInput.setError("Email address required");
+            return;
+        }
+        if (password.isEmpty() || password.length() < 6) {
+            mPasswordInput.setError("Password must be at least 6 characters");
+            return;
+        }
+
+        Toast.makeText(this, "Creating account...", Toast.LENGTH_SHORT).show();
+
+        if (isFirebaseAvailable && mAuth != null) {
+            mAuth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(AuthActivity.this, "Registration Successful!", Toast.LENGTH_SHORT).show();
+                        navigateToMain();
+                    } else {
+                        Toast.makeText(AuthActivity.this, "Registration failed: " + 
+                                (task.getException() != null ? task.getException().getMessage() : "Unknown error"), 
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+        } else {
+            Toast.makeText(this, "Firebase is not available. Please check your configuration.", Toast.LENGTH_LONG).show();
         }
     }
 
