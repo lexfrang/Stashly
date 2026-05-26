@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "59454751835",
+    "project_id": "stashly-aac68",
+    "storage_bucket": "stashly-aac68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:59454751835:android:34c28c2ed96c93f439ab7e",
+        "android_client_info": {
+          "package_name": "com.stashly.stashly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjI5iX1Rn_B-s4K0xFWELnJ98NM2e1pI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
