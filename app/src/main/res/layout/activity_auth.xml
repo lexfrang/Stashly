@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:padding="24dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingBottom="32dp">
+
+            <!-- Title & Branding Spacer -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+
+            <!-- App Logo/Header -->
+            <TextView
+                android:id="@+id/auth_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="Stashly"
+                android:textColor="@color/primary"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/auth_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif"
+                android:text="Smart Budget &amp; Inventory Tracker"
+                android:textColor="@color/text_muted"
+                android:textSize="16sp"
+                android:layout_marginBottom="32dp" />
+
+            <!-- Authenticator elevated container card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_background"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:elevation="4dp"
+                android:translationZ="2dp"
+                android:layout_marginHorizontal="4dp"
+                android:layout_marginBottom="24dp">
+
+                <!-- Email Input Field -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Email address"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <EditText
+                    android:id="@+id/email_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/input_field_background"
+                    android:hint="alex@example.com"
+                    android:inputType="textEmailAddress"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@color/on_surface"
+                    android:textColorHint="@color/text_muted"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="18dp"
+                    android:importantForAutofill="no" />
+
+                <!-- Password Input Field -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Password"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <EditText
+                    android:id="@+id/password_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/input_field_background"
+                    android:hint="••••••••"
+                    android:inputType="textPassword"
+                    android:paddingHorizontal="16dp"
+                    android:textColor="@color/on_surface"
+                    android:textColorHint="@color/text_muted"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="24dp"
+                    android:importantForAutofill="no" />
+
+                <!-- Sign In Button -->
+                <Button
+                    android:id="@+id/sign_in_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/btn_blue_rounded"
+                    app:backgroundTint="@color/accent_blue"
+                    android:text="Sign In"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Sign Up Indicator -->
+                <TextView
+                    android:id="@+id/sign_up_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:text="Don't have an account? Sign Up"
+                    android:textColor="@color/accent_blue"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+            <!-- GUEST MODE SECTION -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OR CONTINUE WITH"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Stylized Prominent Guest Button -->
+            <Button
+                android:id="@+id/guest_mode_button"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="@drawable/btn_dark_rounded"
+                app:backgroundTint="@color/primary"
+                android:text="⚡ Guest Quick Login"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginHorizontal="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sign in instantly using our pre-configured evaluation account"
+                android:textColor="@color/text_muted"
+                android:textSize="12sp"
+                android:layout_marginTop="8dp"
+                android:textAlignment="center" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,6 @@
+{
+  "name": "Stashly",
+  "description": "Stashly is a Smart Collaborative Budgeting & Asset Inventory Tracker implementing a clean Corporate Modern design system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
