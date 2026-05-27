@@ -4,23 +4,35 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
@@ -56,19 +68,36 @@ public class MainActivity extends AppCompatActivity {
     private TextView mGroupInviteCode;
     private Button mBtnInviteAction;
     private LinearLayout mBtnAddMemberMock;
+    private LinearLayout mMembersContainer;
 
     // Settings elements
     private Button mBtnLogout;
     private EditText mInputGroupBudgetCap;
+    private EditText mInputActiveGroupCode;
     private Button mBtnSaveSettings;
+    private Button mBtnJoinGroup;
     private TextView mSettingsCurrentCapLbl;
     private SwitchCompat mSwitchPref1, mSwitchPref2, mSwitchPref3;
+
+    // Recent Activity Rows
+    private View mRowActivity1, mRowActivity2, mRowActivity3;
+
+    // Inventory Elements for Filtering
+    private EditText mSearchBar;
+    private TextView mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners;
+    private LinearLayout mInventoryContainer;
+
+    // Profile Widgets
+    private TextView mToolbarProfileInitials;
+    private TextView mSettingsProfileInitials, mSettingsProfileName, mSettingsProfileEmail;
 
     // Firebase References
     private FirebaseAuth mAuth;
     private FirebaseFirestore mFirestore;
     private boolean isFirebaseAvailable = false;
     private DocumentReference mGroupRef;
+    private com.google.firebase.firestore.ListenerRegistration mGroupListener;
+    private com.google.firebase.firestore.ListenerRegistration mItemsListener;
 
     // Local state simulation fallbacks
     private double mCurrentBudgetSpent = 4250.0;
@@ -77,6 +106,8 @@ public class MainActivity extends AppCompatActivity {
     private double mLiquidCash = 5750.0;
     private String mInviteCode = "STSH9X";
     private String mWorkspaceName = "The BroHouse Crew";
+
+    private List<String> mMembersList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,11 +126,14 @@ public class MainActivity extends AppCompatActivity {
         // Set up Listeners
         setupNavigationListeners();
         setupDashboardListeners();
+        setupRecentActivityListeners();
         setupGroupListeners();
         setupSettingsListeners();
+        setupInventoryLogic();
 
         // Query cloud states or apply local mock levels
         fetchGroupData();
+        updateProfileUI();
     }
 
     private void initViews() {
@@ -135,21 +169,50 @@ public class MainActivity extends AppCompatActivity {
         mBtnTileLog = findViewById(R.id.btn_tile_log);
         mBtnTileAnalysis = findViewById(R.id.btn_tile_analysis);
 
+        // Recent Activity Rows
+        mRowActivity1 = findViewById(R.id.row_activity_1);
+        mRowActivity2 = findViewById(R.id.row_activity_2);
+        mRowActivity3 = findViewById(R.id.row_activity_3);
+
+        // Inventory Filtering
+        mSearchBar = findViewById(R.id.search_bar);
+        mFilterAll = findViewById(R.id.filter_all);
+        mFilterFood = findViewById(R.id.filter_food);
+        mFilterMedicine = findViewById(R.id.filter_medicine);
+        mFilterCleaners = findViewById(R.id.filter_cleaners);
+        
+        mInventoryContainer = findViewById(R.id.inventory_grid_container);
+
+        // Profile widgets
+        mToolbarProfileInitials = findViewById(R.id.toolbar_profile_initials);
+        mSettingsProfileInitials = findViewById(R.id.settings_profile_initials);
+        mSettingsProfileName = findViewById(R.id.settings_profile_name);
+        mSettingsProfileEmail = findViewById(R.id.settings_profile_email);
+        
+        // Member Widgets
+        mMemberAlexInitials = findViewById(R.id.member_alex_initials);
+        mMemberAlexName = findViewById(R.id.member_alex_name);
+
         // Group workspace copy layouts
         mWrapCopyInvite = findViewById(R.id.wrap_copy_invite);
         mGroupInviteCode = findViewById(R.id.group_invite_code);
         mBtnInviteAction = findViewById(R.id.btn_invite_action);
         mBtnAddMemberMock = findViewById(R.id.btn_add_member_mock);
+        mMembersContainer = findViewById(R.id.container_members);
 
         // Settings
         mBtnLogout = findViewById(R.id.btn_logout);
         mInputGroupBudgetCap = findViewById(R.id.input_group_budget_cap);
+        mInputActiveGroupCode = findViewById(R.id.input_active_group_code);
         mBtnSaveSettings = findViewById(R.id.btn_save_settings);
+        mBtnJoinGroup = findViewById(R.id.btn_join_group);
         mSettingsCurrentCapLbl = findViewById(R.id.settings_current_cap_lbl);
         mSwitchPref1 = findViewById(R.id.switch_preferences_1);
         mSwitchPref2 = findViewById(R.id.switch_preferences_2);
         mSwitchPref3 = findViewById(R.id.switch_preferences_3);
     }
+
+    private TextView mMemberAlexInitials, mMemberAlexName;
 
     private void initFirebase() {
         try {
@@ -168,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
     private void setupNavigationListeners() {
         if (mTabDashboard != null) mTabDashboard.setOnClickListener(v -> switchTab(1));
         if (mTabInventory != null) mTabInventory.setOnClickListener(v -> switchTab(2));
-        if (mTabScan != null) mTabScan.setOnClickListener(v -> triggerCameraScanSimulation());
+        if (mTabScan != null) mTabScan.setOnClickListener(v -> showScanOptionsBottomSheet());
         if (mTabGroup != null) mTabGroup.setOnClickListener(v -> switchTab(3));
         if (mTabSettings != null) mTabSettings.setOnClickListener(v -> switchTab(4));
     }
@@ -180,31 +243,54 @@ public class MainActivity extends AppCompatActivity {
         if (mGroupView != null) mGroupView.setVisibility(View.GONE);
         if (mSettingsView != null) mSettingsView.setVisibility(View.GONE);
 
-        int primarySlate = getResources().getColor(R.color.primary);
         int inactiveMuted = getResources().getColor(R.color.text_muted);
         int activeBlue = getResources().getColor(R.color.accent_blue);
 
-        if (mLblDashboard != null) mLblDashboard.setTextColor(inactiveMuted);
-        if (mLblInventory != null) mLblInventory.setTextColor(inactiveMuted);
-        if (mLblGroup != null) mLblGroup.setTextColor(inactiveMuted);
-        if (mLblSettings != null) mLblSettings.setTextColor(inactiveMuted);
+        if (mLblDashboard != null) {
+            mLblDashboard.setTextColor(inactiveMuted);
+            mLblDashboard.setTypeface(null, Typeface.NORMAL);
+        }
+        if (mLblInventory != null) {
+            mLblInventory.setTextColor(inactiveMuted);
+            mLblInventory.setTypeface(null, Typeface.NORMAL);
+        }
+        if (mLblGroup != null) {
+            mLblGroup.setTextColor(inactiveMuted);
+            mLblGroup.setTypeface(null, Typeface.NORMAL);
+        }
+        if (mLblSettings != null) {
+            mLblSettings.setTextColor(inactiveMuted);
+            mLblSettings.setTypeface(null, Typeface.NORMAL);
+        }
 
         switch (tabIndex) {
             case 1:
                 if (mDashboardView != null) mDashboardView.setVisibility(View.VISIBLE);
-                if (mLblDashboard != null) mLblDashboard.setTextColor(activeBlue);
+                if (mLblDashboard != null) {
+                    mLblDashboard.setTextColor(activeBlue);
+                    mLblDashboard.setTypeface(null, Typeface.BOLD);
+                }
                 break;
             case 2:
                 if (mInventoryView != null) mInventoryView.setVisibility(View.VISIBLE);
-                if (mLblInventory != null) mLblInventory.setTextColor(activeBlue);
+                if (mLblInventory != null) {
+                    mLblInventory.setTextColor(activeBlue);
+                    mLblInventory.setTypeface(null, Typeface.BOLD);
+                }
                 break;
             case 3:
                 if (mGroupView != null) mGroupView.setVisibility(View.VISIBLE);
-                if (mLblGroup != null) mLblGroup.setTextColor(activeBlue);
+                if (mLblGroup != null) {
+                    mLblGroup.setTextColor(activeBlue);
+                    mLblGroup.setTypeface(null, Typeface.BOLD);
+                }
                 break;
             case 4:
                 if (mSettingsView != null) mSettingsView.setVisibility(View.VISIBLE);
-                if (mLblSettings != null) mLblSettings.setTextColor(activeBlue);
+                if (mLblSettings != null) {
+                    mLblSettings.setTextColor(activeBlue);
+                    mLblSettings.setTypeface(null, Typeface.BOLD);
+                }
                 break;
         }
     }
@@ -212,16 +298,151 @@ public class MainActivity extends AppCompatActivity {
     private void setupDashboardListeners() {
         if (mBtnTileLog != null) {
             mBtnTileLog.setOnClickListener(v -> {
-                Toast.makeText(this, "\u270F\ufe0f Opening Manual Asset Log staging sheet...", Toast.LENGTH_SHORT).show();
-                switchTab(2); // Go to inventory to stage manual scan items
+                showScanOptionsBottomSheet();
             });
         }
 
         if (mBtnTileAnalysis != null) {
             mBtnTileAnalysis.setOnClickListener(v -> {
-                Toast.makeText(this, "\ud83d\udcc8 Presenting real-time Q3 Financial Trends forecast...", Toast.LENGTH_LONG).show();
+                showDetailedAnalysis();
             });
         }
+    }
+
+    private void showDetailedAnalysis() {
+        String analysisReport = "Q3 Performance Overview:\n\n" +
+                "• Budget Utilization: " + String.format("%.1f%%", (mCurrentBudgetSpent / mCurrentBudgetCap) * 100) + "\n" +
+                "• Asset Appreciation: +4.2% YoY\n" +
+                "• Top Category: Office Equipment (56%)\n" +
+                "• Predicted Waste: $14.50 (Steak expiring)\n\n" +
+                "Recommendation: Reduce liquid cash holdings by 5% to increase asset coverage.";
+
+        new AlertDialog.Builder(this)
+                .setTitle("Financial Analysis")
+                .setMessage(analysisReport)
+                .setPositiveButton("Download PDF", (d, w) -> Toast.makeText(this, "Generating Report...", Toast.LENGTH_SHORT).show())
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void setupInventoryLogic() {
+        if (mSearchBar != null) {
+            mSearchBar.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    filterInventory(s.toString(), "All");
+                }
+                @Override public void afterTextChanged(android.text.Editable s) {}
+            });
+        }
+
+        View.OnClickListener filterClick = v -> {
+            String category = "All";
+            int id = v.getId();
+            if (id == R.id.filter_food) category = "Food";
+            else if (id == R.id.filter_medicine) category = "Medicine";
+            else if (id == R.id.filter_cleaners) category = "Cleaners";
+            
+            updateFilterUI(id);
+            filterInventory(mSearchBar != null ? mSearchBar.getText().toString() : "", category);
+        };
+
+        if (mFilterAll != null) mFilterAll.setOnClickListener(filterClick);
+        if (mFilterFood != null) mFilterFood.setOnClickListener(filterClick);
+        if (mFilterMedicine != null) mFilterMedicine.setOnClickListener(filterClick);
+        if (mFilterCleaners != null) mFilterCleaners.setOnClickListener(filterClick);
+    }
+
+    private void updateFilterUI(int activeId) {
+        TextView[] filters = {mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners};
+        for (TextView f : filters) {
+            if (f == null) continue;
+            if (f.getId() == activeId) {
+                f.setBackgroundResource(R.drawable.btn_dark_rounded);
+                f.setTextColor(getResources().getColor(R.color.white));
+            } else {
+                f.setBackgroundResource(R.drawable.input_field_background);
+                f.setTextColor(getResources().getColor(R.color.primary));
+            }
+        }
+    }
+
+    private void filterInventory(String query, String category) {
+        // Dynamic filtering can be implemented here by iterating mInventoryContainer children
+    }
+
+    private void setupRecentActivityListeners() {
+        View.OnClickListener activityClickListener = v -> {
+            String title = "Activity Details";
+            String desc = "No details available for this item.";
+            
+            int id = v.getId();
+            if (id == R.id.row_activity_1) {
+                title = "MacBook Pro M3 Added";
+                desc = "Office Equipment added to inventory by Alex. \nValue: -$2,400.00 \nCategory: Electronics";
+            } else if (id == R.id.row_activity_2) {
+                title = "Monthly Allocation Reserved";
+                desc = "System automatically allocated $10,000.00 for the October Cycle.";
+            } else if (id == R.id.row_activity_3) {
+                title = "Team Membership";
+                desc = "Sarah joined 'The BroHouse Crew' household workspace.";
+            }
+
+            new AlertDialog.Builder(this)
+                    .setTitle(title)
+                    .setMessage(desc)
+                    .setPositiveButton("Edit", (d, w) -> {
+                        // Open mock edit
+                        showEditActivityDialog(v);
+                    })
+                    .setNegativeButton("Delete", (d, w) -> {
+                        v.setVisibility(View.GONE);
+                        // Find the divider below it and hide it too
+                        View parent = (View) v.getParent();
+                        if (parent instanceof LinearLayout) {
+                            int index = ((LinearLayout) parent).indexOfChild(v);
+                            if (index + 1 < ((LinearLayout) parent).getChildCount()) {
+                                ((LinearLayout) parent).getChildAt(index + 1).setVisibility(View.GONE);
+                            }
+                        }
+                    })
+                    .setNeutralButton("Close", null)
+                    .show();
+        };
+
+        if (mRowActivity1 != null) mRowActivity1.setOnClickListener(activityClickListener);
+        if (mRowActivity2 != null) mRowActivity2.setOnClickListener(activityClickListener);
+        if (mRowActivity3 != null) mRowActivity3.setOnClickListener(activityClickListener);
+    }
+
+    private void showEditActivityDialog(View row) {
+        EditText input = new EditText(this);
+        input.setHint("Update title...");
+        new AlertDialog.Builder(this)
+                .setTitle("Edit Activity")
+                .setView(input)
+                .setPositiveButton("Save", (d, w) -> {
+                    String newTitle = input.getText().toString();
+                    if (!newTitle.isEmpty()) {
+                        TextView titleTv = null;
+                        if (row.getId() == R.id.row_activity_1) titleTv = row.findViewById(R.id.act_amount_1); // Just an example, let's find the correct one
+                        // Actually let's find by type
+                        if (row instanceof android.view.ViewGroup) {
+                            android.view.ViewGroup group = (android.view.ViewGroup) row;
+                            for (int i = 0; i < group.getChildCount(); i++) {
+                                View child = group.getChildAt(i);
+                                if (child instanceof LinearLayout) {
+                                    LinearLayout inner = (LinearLayout) child;
+                                    if (inner.getChildAt(0) instanceof TextView) {
+                                        ((TextView) inner.getChildAt(0)).setText(newTitle);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void setupGroupListeners() {
@@ -234,35 +455,133 @@ public class MainActivity extends AppCompatActivity {
                 ClipData clip = ClipData.newPlainText("Stashly Invite Code", code);
                 if (clipboard != null) {
                     clipboard.setPrimaryClip(clip);
-                    Toast.makeText(this, "\ud83d\udccb Invite ID '" + code + "' copied to Android clipboard!", Toast.LENGTH_SHORT).show();
+                    // Use Snackbar for non-intrusive feedback
+                    com.google.android.material.snackbar.Snackbar.make(v, "Code " + code + " copied!", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show();
                 }
             });
         }
 
         if (mBtnInviteAction != null) {
             mBtnInviteAction.setOnClickListener(v -> {
-                Toast.makeText(this, "\u2709\ufe0f Generated secure join link for 'The BroHouse Crew'!", Toast.LENGTH_SHORT).show();
+                Intent sendIntent = new Intent();
+                sendIntent.setAction(Intent.ACTION_SEND);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, "Join my Stashly workspace using code: " + mInviteCode);
+                sendIntent.setType("text/plain");
+                startActivity(Intent.createChooser(sendIntent, "Share Invite Code"));
             });
         }
 
         if (mBtnAddMemberMock != null) {
             mBtnAddMemberMock.setOnClickListener(v -> {
-                Toast.makeText(this, "⚡ Sending notification payload to new pending members!", Toast.LENGTH_SHORT).show();
+                showAddMemberDialog();
             });
         }
+    }
+
+    private void showAddMemberDialog() {
+        EditText input = new EditText(this);
+        input.setHint("Name or Email");
+        new AlertDialog.Builder(this)
+                .setTitle("Invite Member")
+                .setMessage("Enter the identifier for the person you want to add. They will see the invite when they join this group code.")
+                .setView(input)
+                .setPositiveButton("Send Invite", (d, w) -> {
+                    String identifier = input.getText().toString();
+                    if (!identifier.isEmpty()) {
+                        if (isFirebaseAvailable && mGroupRef != null) {
+                            mGroupRef.update("members", FieldValue.arrayUnion(identifier))
+                                    .addOnSuccessListener(aVoid -> com.google.android.material.snackbar.Snackbar.make(mGroupView, "Invite sent to " + identifier, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show());
+                        } else {
+                            addMemberToUI(identifier);
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void addMemberToUI(String name) {
+        if (mMembersContainer == null) return;
+        
+        float density = getResources().getDisplayMetrics().density;
+        String initials = name.length() > 1 ? name.substring(0, 2).toUpperCase() : name.toUpperCase();
+        
+        LinearLayout memberLayout = new LinearLayout(this);
+        LinearLayout.LayoutParams memberParams = new LinearLayout.LayoutParams((int) (72 * density), LinearLayout.LayoutParams.WRAP_CONTENT);
+        memberParams.setMargins(0, 0, (int) (12 * density), 0);
+        memberLayout.setLayoutParams(memberParams);
+        memberLayout.setOrientation(LinearLayout.VERTICAL);
+        memberLayout.setGravity(android.view.Gravity.CENTER);
+
+        FrameLayout frame = new FrameLayout(this);
+        frame.setLayoutParams(new LinearLayout.LayoutParams((int) (54 * density), (int) (54 * density)));
+        frame.setBackgroundResource(R.drawable.input_field_background);
+
+        TextView initialsTv = new TextView(this);
+        FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        initialsTv.setLayoutParams(textParams);
+        initialsTv.setGravity(android.view.Gravity.CENTER);
+        initialsTv.setText(initials);
+        initialsTv.setTextColor(getResources().getColor(R.color.primary));
+        initialsTv.setTextSize(14);
+        initialsTv.setTypeface(null, Typeface.BOLD);
+
+        frame.addView(initialsTv);
+        memberLayout.addView(frame);
+
+        TextView nameTv = new TextView(this);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        nameParams.topMargin = (int) (6 * density);
+        nameTv.setLayoutParams(nameParams);
+        nameTv.setText(name);
+        nameTv.setTextColor(getResources().getColor(R.color.primary));
+        nameTv.setTextSize(11);
+        
+        memberLayout.addView(nameTv);
+        
+        // Add before the "Add" button
+        mMembersContainer.addView(memberLayout, mMembersContainer.getChildCount() - 1);
     }
 
     private void setupSettingsListeners() {
         // Logout configuration
         if (mBtnLogout != null) {
             mBtnLogout.setOnClickListener(v -> {
-                if (isFirebaseAvailable && mAuth != null) {
-                    mAuth.signOut();
+                new AlertDialog.Builder(this)
+                        .setTitle("Log Out")
+                        .setMessage("Are you sure you want to sign out?")
+                        .setPositiveButton("Yes", (d, w) -> {
+                            if (isFirebaseAvailable && mAuth != null) {
+                                mAuth.signOut();
+                            }
+                            Intent intent = new Intent(MainActivity.this, AuthActivity.class);
+                            startActivity(intent);
+                            finish();
+                        })
+                        .setNegativeButton("No", null)
+                        .show();
+            });
+        }
+
+        // Join Group Sync
+        if (mBtnJoinGroup != null) {
+            mBtnJoinGroup.setOnClickListener(v -> {
+                if (mInputActiveGroupCode == null) return;
+                String newCode = mInputActiveGroupCode.getText().toString().trim().toUpperCase();
+                if (newCode.isEmpty()) {
+                    mInputActiveGroupCode.setError("Code required");
+                    return;
                 }
-                Toast.makeText(MainActivity.this, "Sign-out successful. Goodbye!", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(MainActivity.this, AuthActivity.class);
-                startActivity(intent);
-                finish();
+                
+                mInviteCode = newCode;
+                if (mGroupInviteCode != null) mGroupInviteCode.setText(newCode);
+                
+                if (isFirebaseAvailable && mFirestore != null) {
+                    if (mGroupListener != null) mGroupListener.remove();
+                    mGroupRef = mFirestore.collection("groups").document(newCode);
+                    fetchGroupData();
+                    Toast.makeText(this, "Syncing to group " + newCode, Toast.LENGTH_SHORT).show();
+                }
             });
         }
 
@@ -302,36 +621,96 @@ public class MainActivity extends AppCompatActivity {
 
         // Preference Switch toasts
         if (mSwitchPref1 != null) {
-            mSwitchPref1.setOnCheckedChangeListener((b, checked) -> 
-                Toast.makeText(this, "Expiration Warnings (48h): " + (checked ? "ON" : "OFF"), Toast.LENGTH_SHORT).show());
+            mSwitchPref1.setOnCheckedChangeListener((b, checked) -> {
+                // Update local preference simulation
+            });
         }
         if (mSwitchPref2 != null) {
-            mSwitchPref2.setOnCheckedChangeListener((b, checked) -> 
-                Toast.makeText(this, "Daily Digests: " + (checked ? "ON" : "OFF"), Toast.LENGTH_SHORT).show());
+            mSwitchPref2.setOnCheckedChangeListener((b, checked) -> {
+                // Update local preference simulation
+            });
         }
         if (mSwitchPref3 != null) {
-            mSwitchPref3.setOnCheckedChangeListener((b, checked) -> 
-                Toast.makeText(this, "Weekly Waste Reports: " + (checked ? "ON" : "OFF"), Toast.LENGTH_SHORT).show());
+            mSwitchPref3.setOnCheckedChangeListener((b, checked) -> {
+                // Update local preference simulation
+            });
         }
     }
 
+    private void showScanOptionsBottomSheet() {
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.layout_scan_options, null);
+        
+        view.findViewById(R.id.option_manual).setOnClickListener(v -> {
+            dialog.dismiss();
+            showManualInputDialog();
+        });
+        
+        view.findViewById(R.id.option_camera).setOnClickListener(v -> {
+            dialog.dismiss();
+            triggerCameraScanSimulation();
+        });
+        
+        view.findViewById(R.id.option_file).setOnClickListener(v -> {
+            dialog.dismiss();
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            startActivityForResult(Intent.createChooser(intent, "Select Receipt Image"), 101);
+        });
+
+        dialog.setContentView(view);
+        dialog.show();
+    }
+
+    private void showManualInputDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
+        EditText nameInput = dialogView.findViewById(R.id.input_item_name);
+        EditText priceInput = dialogView.findViewById(R.id.input_item_price);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Manual Asset Entry")
+                .setView(dialogView)
+                .setPositiveButton("Add to Stash", (d, w) -> {
+                    String name = nameInput.getText().toString();
+                    String priceStr = priceInput.getText().toString();
+                    if (!name.isEmpty() && !priceStr.isEmpty()) {
+                        double price = Double.parseDouble(priceStr);
+                        
+                        if (isFirebaseAvailable && mGroupRef != null) {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("name", name);
+                            item.put("price", price);
+                            item.put("category", "General");
+                            item.put("emoji", "📦");
+                            
+                            mGroupRef.collection("items").add(item);
+                            mGroupRef.update("budgetSpent", FieldValue.increment(price));
+                            mGroupRef.update("activeAssetsValue", FieldValue.increment(price));
+                        }
+                        
+                        switchTab(2);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void triggerCameraScanSimulation() {
-        Toast.makeText(this, "\ud83d\udcf7 Initializing ML Kit Ingestion Scanner...", Toast.LENGTH_SHORT).show();
+        // Show a progress dialog instead of Toast
+        AlertDialog progress = new AlertDialog.Builder(this)
+                .setTitle("Scanning...")
+                .setMessage("ML Kit is analyzing receipt...")
+                .setCancelable(false)
+                .show();
         
         new Handler().postDelayed(() -> {
-            Toast.makeText(this, "\u26A1 Extractions complete! Bounty Paper & Milk staged for review.", Toast.LENGTH_LONG).show();
-            switchTab(2); // Jump straight to staging area to show the staged scanned purchases!
+            progress.dismiss();
+            switchTab(2); // Jump straight to staging area
             
-            // Increment budget spent local state as simulated purchase integration
-            mCurrentBudgetSpent += 17.49; // Total of staging
+            // Increment budget spent local state
+            mCurrentBudgetSpent += 17.49;
             mActiveAssetsValue += 17.49;
-            if (mDashboardBudgetSpentLbl != null) {
-                mDashboardBudgetSpentLbl.setText("$" + String.format("%,.0f", mCurrentBudgetSpent));
-            }
-            if (mDashboardAssetsVal != null) {
-                mDashboardAssetsVal.setText("$" + String.format("%,.2f", mActiveAssetsValue));
-            }
-            updateRatioBar();
+            applyLocalMockData();
         }, 1200);
     }
 
@@ -355,6 +734,10 @@ public class MainActivity extends AppCompatActivity {
             if (mDashboardLiquidVal != null) {
                 mDashboardLiquidVal.setText("$" + String.format("%,.2f", mLiquidCash));
             }
+            
+            TextView groupTitle = findViewById(R.id.group_workspace_title);
+            if (groupTitle != null) groupTitle.setText(mWorkspaceName);
+            
             updateRatioBar();
         } catch (Throwable t) {
             // Safe fallback
@@ -364,33 +747,37 @@ public class MainActivity extends AppCompatActivity {
     private void fetchGroupData() {
         if (isFirebaseAvailable && mGroupRef != null) {
             try {
-                mGroupRef.addSnapshotListener((snapshot, e) -> {
+                // Listen to Group Metadata (Budget, Members, etc.)
+                mGroupListener = mGroupRef.addSnapshotListener((snapshot, e) -> {
                     try {
-                        if (e != null) {
+                        if (e != null || snapshot == null || !snapshot.exists()) {
                             applyLocalMockData();
                             return;
                         }
-                        if (snapshot != null && snapshot.exists()) {
-                            Double cap = snapshot.getDouble("budgetCap");
-                            Double spent = snapshot.getDouble("budgetSpent");
-                            Double assets = snapshot.getDouble("activeAssetsValue");
-                            Double liquid = snapshot.getDouble("liquidCash");
-
-                            if (cap != null) mCurrentBudgetCap = cap;
-                            if (spent != null) mCurrentBudgetSpent = spent;
-                            if (assets != null) mActiveAssetsValue = assets;
-                            if (liquid != null) mLiquidCash = liquid;
-
-                            applyLocalMockData();
-                        } else {
-                            // Document empty/missing but firebase connected. Safely initialize.
-                            provisionFirestoreDefaults();
-                            applyLocalMockData();
+                        
+                        mCurrentBudgetCap = snapshot.getDouble("budgetCap") != null ? snapshot.getDouble("budgetCap") : 10000.0;
+                        mCurrentBudgetSpent = snapshot.getDouble("budgetSpent") != null ? snapshot.getDouble("budgetSpent") : 0.0;
+                        mActiveAssetsValue = snapshot.getDouble("activeAssetsValue") != null ? snapshot.getDouble("activeAssetsValue") : 0.0;
+                        mLiquidCash = snapshot.getDouble("liquidCash") != null ? snapshot.getDouble("liquidCash") : 0.0;
+                        mWorkspaceName = snapshot.getString("workspaceName") != null ? snapshot.getString("workspaceName") : "Workspace";
+                        
+                        List<String> members = (List<String>) snapshot.get("members");
+                        if (members != null) {
+                            mMembersList = members;
+                            syncMembersToUI();
                         }
-                    } catch (Throwable innerEx) {
+                        applyLocalMockData();
+                    } catch (Throwable t) {
                         applyLocalMockData();
                     }
                 });
+
+                // Listen to Real Inventory Items
+                mItemsListener = mGroupRef.collection("items").addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) return;
+                    renderInventoryItems(snapshots);
+                });
+
             } catch (Throwable ex) {
                 isFirebaseAvailable = false;
                 applyLocalMockData();
@@ -400,17 +787,137 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void provisionFirestoreDefaults() {
-        if (isFirebaseAvailable && mGroupRef != null) {
-            Map<String, Object> data = new HashMap<>();
-            data.put("budgetCap", mCurrentBudgetCap);
-            data.put("budgetSpent", mCurrentBudgetSpent);
-            data.put("activeAssetsValue", mActiveAssetsValue);
-            data.put("liquidCash", mLiquidCash);
-            data.put("inviteCode", mInviteCode);
-            data.put("workspaceName", mWorkspaceName);
-            mGroupRef.set(data);
+    private void renderInventoryItems(com.google.firebase.firestore.QuerySnapshot snapshots) {
+        if (mInventoryContainer == null) return;
+        mInventoryContainer.removeAllViews();
+        
+        float density = getResources().getDisplayMetrics().density;
+        LinearLayout currentRow = null;
+
+        int count = 0;
+        for (QueryDocumentSnapshot doc : snapshots) {
+            String name = doc.getString("name");
+            Double price = doc.getDouble("price");
+            String category = doc.getString("category");
+            String emoji = doc.getString("emoji");
+            if (emoji == null) emoji = "📦";
+
+            if (count % 2 == 0) {
+                currentRow = new LinearLayout(this);
+                currentRow.setOrientation(LinearLayout.HORIZONTAL);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                rowParams.setMargins(0, 0, 0, (int) (12 * density));
+                currentRow.setLayoutParams(rowParams);
+                mInventoryContainer.addView(currentRow);
+            }
+
+            View card = createInventoryCard(doc.getId(), name, price, category, emoji);
+            currentRow.addView(card);
+            count++;
         }
+    }
+
+    private View createInventoryCard(String id, String name, Double price, String category, String emoji) {
+        float density = getResources().getDisplayMetrics().density;
+        
+        LinearLayout card = new LinearLayout(this);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+        card.setLayoutParams(params);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding((int) (12 * density), (int) (12 * density), (int) (12 * density), (int) (12 * density));
+        card.setBackgroundResource(R.drawable.card_background);
+        card.setElevation(2 * density);
+        
+        // Margin handling for grid
+        // This is a bit complex via code, so we'll just add padding to the row instead or use a simpler layout.
+        
+        TextView emojiTv = new TextView(this);
+        emojiTv.setText(emoji);
+        emojiTv.setTextSize(36);
+        emojiTv.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
+        card.addView(emojiTv);
+
+        TextView nameTv = new TextView(this);
+        nameTv.setText(name);
+        nameTv.setTypeface(null, Typeface.BOLD);
+        nameTv.setTextColor(getResources().getColor(R.color.primary));
+        nameTv.setTextSize(13);
+        card.addView(nameTv);
+
+        TextView priceTv = new TextView(this);
+        priceTv.setText("$" + String.format("%.2f", price != null ? price : 0.0));
+        priceTv.setTextColor(getResources().getColor(R.color.text_muted));
+        priceTv.setTextSize(11);
+        card.addView(priceTv);
+
+        card.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle(name)
+                    .setMessage("Remove this item from stash?")
+                    .setPositiveButton("Remove / Consume", (d, w) -> {
+                        mGroupRef.collection("items").document(id).delete();
+                        // Update group totals
+                        mGroupRef.update("activeAssetsValue", FieldValue.increment(-(price != null ? price : 0.0)));
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        return card;
+    }
+
+    private void syncMembersToUI() {
+        if (mMembersContainer == null) return;
+        
+        // Clear dynamic members (keep Alex at 0 and Add button at end)
+        int childCount = mMembersContainer.getChildCount();
+        if (childCount > 2) {
+            mMembersContainer.removeViews(1, childCount - 2);
+        }
+        
+        for (String member : mMembersList) {
+            addMemberToUI(member);
+        }
+    }
+
+    private void updateProfileUI() {
+        FirebaseUser user = (mAuth != null) ? mAuth.getCurrentUser() : null;
+        String name = "Alex";
+        String email = "alex@brohousecrew.com";
+        String initials = "AL";
+
+        if (user != null) {
+            if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
+                name = user.getDisplayName();
+            } else if (user.getEmail() != null) {
+                name = user.getEmail().split("@")[0];
+            }
+            if (user.getEmail() != null) {
+                email = user.getEmail();
+            }
+
+            // Generate initials
+            String[] parts = name.split(" ");
+            if (parts.length > 0 && !parts[0].isEmpty()) {
+                initials = String.valueOf(parts[0].charAt(0));
+                if (parts.length > 1 && !parts[1].isEmpty()) {
+                    initials += String.valueOf(parts[1].charAt(0));
+                }
+            } else {
+                initials = "U";
+            }
+            initials = initials.toUpperCase();
+        }
+
+        if (mToolbarProfileInitials != null) mToolbarProfileInitials.setText(initials);
+        if (mSettingsProfileInitials != null) mSettingsProfileInitials.setText(initials);
+        if (mSettingsProfileName != null) mSettingsProfileName.setText(name);
+        if (mSettingsProfileEmail != null) mSettingsProfileEmail.setText(email);
+        
+        // Update Alex in members list
+        if (mMemberAlexInitials != null) mMemberAlexInitials.setText(initials);
+        if (mMemberAlexName != null) mMemberAlexName.setText(name);
     }
 
     private void updateRatioBar() {

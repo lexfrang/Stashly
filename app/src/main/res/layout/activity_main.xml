@@ -37,6 +37,7 @@
             android:background="@drawable/tag_green_tint">
 
             <TextView
+                android:id="@+id/toolbar_profile_initials"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
@@ -58,7 +59,8 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:paddingBottom="80dp">
 
             <!-- ================= VIEW 1: DASHBOARD ================= -->
             <LinearLayout
@@ -399,10 +401,12 @@
 
                     <!-- Row 1 -->
                     <RelativeLayout
+                        android:id="@+id/row_activity_1"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground">
 
                         <TextView
                             android:id="@+id/act_emoji_1"
@@ -413,9 +417,10 @@
                             android:layout_centerVertical="true" />
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_toEndOf="@id/act_emoji_1"
+                            android:layout_toStartOf="@+id/act_amount_1"
                             android:layout_marginStart="14dp"
                             android:orientation="vertical">
 
@@ -425,7 +430,9 @@
                                 android:text="MacBook Pro M3 Added"
                                 android:textColor="@color/primary"
                                 android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                android:ellipsize="end"
+                                android:maxLines="1" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -436,6 +443,7 @@
                         </LinearLayout>
 
                         <TextView
+                            android:id="@+id/act_amount_1"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
@@ -455,10 +463,12 @@
 
                     <!-- Row 2 -->
                     <RelativeLayout
+                        android:id="@+id/row_activity_2"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground">
 
                         <TextView
                             android:id="@+id/act_emoji_2"
@@ -469,9 +479,10 @@
                             android:layout_centerVertical="true" />
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_toEndOf="@id/act_emoji_2"
+                            android:layout_toStartOf="@+id/act_amount_2"
                             android:layout_marginStart="14dp"
                             android:orientation="vertical">
 
@@ -481,7 +492,9 @@
                                 android:text="Monthly Allocation Reserved"
                                 android:textColor="@color/primary"
                                 android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                android:ellipsize="end"
+                                android:maxLines="1" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -492,6 +505,7 @@
                         </LinearLayout>
 
                         <TextView
+                            android:id="@+id/act_amount_2"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
@@ -511,10 +525,12 @@
 
                     <!-- Row 3 -->
                     <RelativeLayout
+                        android:id="@+id/row_activity_3"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                        android:paddingVertical="12dp"
+                        android:background="?attr/selectableItemBackground">
 
                         <TextView
                             android:id="@+id/act_emoji_3"
@@ -525,9 +541,10 @@
                             android:layout_centerVertical="true" />
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_toEndOf="@id/act_emoji_3"
+                            android:layout_toStartOf="@+id/act_status_3"
                             android:layout_marginStart="14dp"
                             android:orientation="vertical">
 
@@ -537,7 +554,9 @@
                                 android:text="Sarah joined Team"
                                 android:textColor="@color/primary"
                                 android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:textStyle="bold"
+                                android:ellipsize="end"
+                                android:maxLines="1" />
 
                             <TextView
                                 android:layout_width="wrap_content"
@@ -548,6 +567,7 @@
                         </LinearLayout>
 
                         <TextView
+                            android:id="@+id/act_status_3"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
@@ -914,199 +934,12 @@
 
                 <!-- Grid system of storage cards (2 columns, simple simulated LinearLayout rows of grids) -->
                 <LinearLayout
+                    android:id="@+id/inventory_grid_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <!-- Grid Row 1 -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-
-                        <!-- Item Grid Card A1 -->
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:background="@drawable/card_background"
-                            android:orientation="vertical"
-                            android:padding="12dp"
-                            android:layout_marginEnd="6dp"
-                            android:elevation="2dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🥩"
-                                android:textSize="36dp"
-                                android:layout_gravity="center_horizontal"
-                                android:layout_marginVertical="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Fresh Ribeye Steak"
-                                android:textStyle="bold"
-                                android:textColor="@color/primary"
-                                android:textSize="13sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Expiring Soon"
-                                android:textColor="@color/urgency_red"
-                                android:textSize="11dp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Qty: 2 packs"
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp"
-                                android:layout_marginTop="6dp" />
-                        </LinearLayout>
-
-                        <!-- Item Grid Card A2 -->
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:background="@drawable/card_background"
-                            android:orientation="vertical"
-                            android:padding="12dp"
-                            android:layout_marginStart="6dp"
-                            android:elevation="2dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🥛"
-                                android:textSize="36dp"
-                                android:layout_gravity="center_horizontal"
-                                android:layout_marginVertical="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Organic Whole Milk"
-                                android:textStyle="bold"
-                                android:textColor="@color/primary"
-                                android:textSize="13sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Added Today"
-                                android:textColor="@color/growth_green"
-                                android:textSize="11dp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Qty: 1 Gallon"
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp"
-                                android:layout_marginTop="6dp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Grid Row 2 -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="12dp">
-
-                        <!-- Item Grid Card B1 -->
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:background="@drawable/card_background"
-                            android:orientation="vertical"
-                            android:padding="12dp"
-                            android:layout_marginEnd="6dp"
-                            android:elevation="2dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🧻"
-                                android:textSize="36dp"
-                                android:layout_gravity="center_horizontal"
-                                android:layout_marginVertical="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Bounty Paper Towels"
-                                android:textStyle="bold"
-                                android:textColor="@color/primary"
-                                android:textSize="13sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="No Alert"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Qty: 6 Rolls"
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp"
-                                android:layout_marginTop="6dp" />
-                        </LinearLayout>
-
-                        <!-- Item Grid Card B2 -->
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:background="@drawable/card_background"
-                            android:orientation="vertical"
-                            android:padding="12dp"
-                            android:layout_marginStart="6dp"
-                            android:elevation="2dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="💊"
-                                android:textSize="36dp"
-                                android:layout_gravity="center_horizontal"
-                                android:layout_marginVertical="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Ibuprofen 200mg"
-                                android:textStyle="bold"
-                                android:textColor="@color/primary"
-                                android:textSize="13sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Good until 2028"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Qty: 100 count"
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp"
-                                android:layout_marginTop="6dp" />
-                        </LinearLayout>
-                    </LinearLayout>
+                    <!-- Content will be added dynamically from Firestore -->
 
                 </LinearLayout>
 
@@ -1218,13 +1051,15 @@
 
                 <!-- Member tracking array using structural circular profile pictures -->
                 <LinearLayout
+                    android:id="@+id/container_members"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:layout_marginBottom="24dp">
 
-                    <!-- Member 1: Alex -->
+                    <!-- Alex (Current User) -->
                     <LinearLayout
+                        android:id="@+id/member_alex"
                         android:layout_width="72dp"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
@@ -1242,10 +1077,11 @@
                                 android:background="@drawable/tag_green_tint" />
 
                             <TextView
+                                android:id="@+id/member_alex_initials"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:text="Alex"
+                                android:text="AL"
                                 android:textColor="@color/growth_green"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
@@ -1260,98 +1096,15 @@
                         </FrameLayout>
 
                         <TextView
+                            android:id="@+id/member_alex_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Alex (You)"
+                            android:text="Alex"
                             android:textColor="@color/primary"
                             android:textSize="11dp" />
                     </LinearLayout>
 
-                    <!-- Member 2: Sam -->
-                    <LinearLayout
-                        android:layout_width="72dp"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:layout_marginEnd="12dp">
-
-                        <FrameLayout
-                            android:layout_width="54dp"
-                            android:layout_height="54dp"
-                            android:layout_marginBottom="6dp">
-
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/input_field_background" />
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="Sam"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <View
-                                android:layout_width="12dp"
-                                android:layout_height="12dp"
-                                android:background="@drawable/tag_green_tint"
-                                android:layout_gravity="bottom|end"
-                                android:layout_margin="1dp"/>
-                        </FrameLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sam"
-                            android:textColor="@color/primary"
-                            android:textSize="11dp" />
-                    </LinearLayout>
-
-                    <!-- Member 3: Jordan -->
-                    <LinearLayout
-                        android:layout_width="72dp"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:layout_marginEnd="12dp">
-
-                        <FrameLayout
-                            android:layout_width="54dp"
-                            android:layout_height="54dp"
-                            android:layout_marginBottom="6dp">
-
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:background="@drawable/input_field_background" />
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="Jordan"
-                                android:textColor="@color/accent_blue"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <View
-                                android:layout_width="12dp"
-                                android:layout_height="12dp"
-                                android:background="@android:color/holo_blue_light"
-                                android:layout_gravity="bottom|end"
-                                android:layout_margin="1dp"/>
-                        </FrameLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Jordan"
-                            android:textColor="@color/primary"
-                            android:textSize="11dp" />
-                    </LinearLayout>
+                    <!-- Dynamically loaded members go here -->
 
                     <!-- Add icon trigger placeholder -->
                     <LinearLayout
@@ -1578,6 +1331,7 @@
                         android:layout_marginBottom="12dp">
 
                         <TextView
+                            android:id="@+id/settings_profile_initials"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:text="Alex"
@@ -1588,6 +1342,7 @@
                     </FrameLayout>
 
                     <TextView
+                        android:id="@+id/settings_profile_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Alex"
@@ -1596,6 +1351,7 @@
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/settings_profile_email"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="alex@brohousecrew.com"
@@ -1614,6 +1370,68 @@
                         android:textColor="@color/urgency_red"
                         android:textStyle="bold"
                         android:textSize="14sp"/>
+                </LinearLayout>
+
+                <!-- Editable Workspace configurations card -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/card_background"
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:elevation="2dp"
+                    android:layout_marginBottom="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Workspace Management"
+                        android:textColor="@color/primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Change your active household group code."
+                        android:textColor="@color/text_muted"
+                        android:textSize="12dp"
+                        android:layout_marginBottom="14dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Active Group Code"
+                        android:textColor="@color/primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="6dp" />
+
+                    <EditText
+                        android:id="@+id/input_active_group_code"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/input_field_background"
+                        android:hint="STSH9X"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/primary"
+                        android:textSize="14sp"
+                        android:layout_marginBottom="14dp"
+                        android:importantForAutofill="no" />
+
+                    <!-- Asynchronous save handler button -->
+                    <Button
+                        android:id="@+id/btn_join_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/btn_dark_rounded"
+                        app:backgroundTint="@color/primary"
+                        android:text="Join / Sync Group"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="false" />
                 </LinearLayout>
 
                 <!-- Editable Workspace configurations card -->
@@ -1847,7 +1665,7 @@
     </ScrollView>
 
 
-    <!-- ================= PREMIUM BOTTOM NAVIGATION LAYOUT BAR ================= -->
+    <!-- Premium Bottom Navigation Layout Bar -->
     <LinearLayout
         android:id="@+id/bottom_navigation_container"
         android:layout_width="match_parent"
@@ -1855,6 +1673,8 @@
         android:background="@color/white"
         android:orientation="horizontal"
         android:elevation="12dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         app:layout_constraintBottom_toBottomOf="parent">
 
         <!-- Tab 1: Dashboard -->
