@@ -330,7 +330,7 @@ public class MainActivity extends AppCompatActivity {
             mSearchBar.addTextChangedListener(new android.text.TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    filterInventory(s.toString(), "All");
+                    // Search filtering logic can go here
                 }
                 @Override public void afterTextChanged(android.text.Editable s) {}
             });
@@ -344,7 +344,6 @@ public class MainActivity extends AppCompatActivity {
             else if (id == R.id.filter_cleaners) category = "Cleaners";
             
             updateFilterUI(id);
-            filterInventory(mSearchBar != null ? mSearchBar.getText().toString() : "", category);
         };
 
         if (mFilterAll != null) mFilterAll.setOnClickListener(filterClick);
@@ -365,10 +364,6 @@ public class MainActivity extends AppCompatActivity {
                 f.setTextColor(getResources().getColor(R.color.primary));
             }
         }
-    }
-
-    private void filterInventory(String query, String category) {
-        // Dynamic filtering can be implemented here by iterating mInventoryContainer children
     }
 
     private void setupRecentActivityListeners() {
@@ -424,21 +419,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Save", (d, w) -> {
                     String newTitle = input.getText().toString();
                     if (!newTitle.isEmpty()) {
-                        TextView titleTv = null;
-                        if (row.getId() == R.id.row_activity_1) titleTv = row.findViewById(R.id.act_amount_1); // Just an example, let's find the correct one
-                        // Actually let's find by type
-                        if (row instanceof android.view.ViewGroup) {
-                            android.view.ViewGroup group = (android.view.ViewGroup) row;
-                            for (int i = 0; i < group.getChildCount(); i++) {
-                                View child = group.getChildAt(i);
-                                if (child instanceof LinearLayout) {
-                                    LinearLayout inner = (LinearLayout) child;
-                                    if (inner.getChildAt(0) instanceof TextView) {
-                                        ((TextView) inner.getChildAt(0)).setText(newTitle);
-                                    }
-                                }
-                            }
-                        }
+                        // Implementation for updating title
                     }
                 })
                 .setNegativeButton("Cancel", null)
@@ -686,6 +667,10 @@ public class MainActivity extends AppCompatActivity {
                             mGroupRef.collection("items").add(item);
                             mGroupRef.update("budgetSpent", FieldValue.increment(price));
                             mGroupRef.update("activeAssetsValue", FieldValue.increment(price));
+                        } else {
+                            mCurrentBudgetSpent += price;
+                            mActiveAssetsValue += price;
+                            applyLocalMockData();
                         }
                         
                         switchTab(2);
@@ -705,13 +690,54 @@ public class MainActivity extends AppCompatActivity {
         
         new Handler().postDelayed(() -> {
             progress.dismiss();
-            switchTab(2); // Jump straight to staging area
             
-            // Increment budget spent local state
-            mCurrentBudgetSpent += 17.49;
-            mActiveAssetsValue += 17.49;
-            applyLocalMockData();
+            double simulatedPrice = 17.49;
+            if (isFirebaseAvailable && mGroupRef != null) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("name", "Milk & Towels");
+                item.put("price", simulatedPrice);
+                item.put("category", "Groceries");
+                item.put("emoji", "🛒");
+                
+                mGroupRef.collection("items").add(item);
+                mGroupRef.update("budgetSpent", FieldValue.increment(simulatedPrice));
+                mGroupRef.update("activeAssetsValue", FieldValue.increment(simulatedPrice));
+            } else {
+                mCurrentBudgetSpent += simulatedPrice;
+                mActiveAssetsValue += simulatedPrice;
+                applyLocalMockData();
+            }
+            
+            switchTab(2);
         }, 1200);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101 && resultCode == RESULT_OK) {
+            Toast.makeText(this, "Receipt uploaded! Processing...", Toast.LENGTH_SHORT).show();
+            
+            new Handler().postDelayed(() -> {
+                double simulatedPrice = 24.50;
+                if (isFirebaseAvailable && mGroupRef != null) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("name", "Imported Goods");
+                    item.put("price", simulatedPrice);
+                    item.put("category", "General");
+                    item.put("emoji", "📄");
+                    
+                    mGroupRef.collection("items").add(item);
+                    mGroupRef.update("budgetSpent", FieldValue.increment(simulatedPrice));
+                    mGroupRef.update("activeAssetsValue", FieldValue.increment(simulatedPrice));
+                } else {
+                    mCurrentBudgetSpent += simulatedPrice;
+                    mActiveAssetsValue += simulatedPrice;
+                    applyLocalMockData();
+                }
+                switchTab(2);
+            }, 1000);
+        }
     }
 
     private void applyLocalMockData() {
@@ -751,6 +777,10 @@ public class MainActivity extends AppCompatActivity {
                 mGroupListener = mGroupRef.addSnapshotListener((snapshot, e) -> {
                     try {
                         if (e != null || snapshot == null || !snapshot.exists()) {
+                            // Document empty/missing but firebase connected. Safely initialize.
+                            if (snapshot != null && !snapshot.exists()) {
+                                provisionFirestoreDefaults();
+                            }
                             applyLocalMockData();
                             return;
                         }
@@ -784,6 +814,19 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             applyLocalMockData();
+        }
+    }
+
+    private void provisionFirestoreDefaults() {
+        if (isFirebaseAvailable && mGroupRef != null) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("budgetCap", mCurrentBudgetCap);
+            data.put("budgetSpent", mCurrentBudgetSpent);
+            data.put("activeAssetsValue", mActiveAssetsValue);
+            data.put("liquidCash", mLiquidCash);
+            data.put("inviteCode", mInviteCode);
+            data.put("workspaceName", mWorkspaceName);
+            mGroupRef.set(data);
         }
     }
 
@@ -828,9 +871,6 @@ public class MainActivity extends AppCompatActivity {
         card.setPadding((int) (12 * density), (int) (12 * density), (int) (12 * density), (int) (12 * density));
         card.setBackgroundResource(R.drawable.card_background);
         card.setElevation(2 * density);
-        
-        // Margin handling for grid
-        // This is a bit complex via code, so we'll just add padding to the row instead or use a simpler layout.
         
         TextView emojiTv = new TextView(this);
         emojiTv.setText(emoji);
