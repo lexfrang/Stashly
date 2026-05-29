@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Stashly</string>
+    <string name="StashLogo">📦</string>
+    <string name="StashUnderLogo">Stash</string>
 </resources>
