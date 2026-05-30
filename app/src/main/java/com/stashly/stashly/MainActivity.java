@@ -4,19 +4,26 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
@@ -27,13 +34,26 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.moshi.MoshiConverterFactory;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -86,6 +106,28 @@ public class MainActivity extends AppCompatActivity {
     private EditText mSearchBar;
     private TextView mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners;
     private LinearLayout mInventoryContainer;
+    private LinearLayout mStagedContainer;
+
+    // Staging Data
+    private List<StagedItem> mStagedItems = new ArrayList<>();
+    
+    // AI Recognition (Groq)
+    private GroqService mGroqService;
+    private static final String GROQ_API_KEY = BuildConfig.GROQ_API_KEY;
+
+    private static class StagedItem {
+        String name;
+        double price;
+        String category;
+        String emoji;
+
+        StagedItem(String name, double price, String category, String emoji) {
+            this.name = name;
+            this.price = price;
+            this.category = category;
+            this.emoji = emoji;
+        }
+    }
 
     // Profile Widgets
     private TextView mToolbarProfileInitials;
@@ -117,8 +159,9 @@ public class MainActivity extends AppCompatActivity {
         // Bind Views
         initViews();
 
-        // Safe Firebase setup
+        // Safe Firebase & AI setup
         initFirebase();
+        initGroq();
 
         // Default to Dashboard tab
         switchTab(1);
@@ -182,6 +225,7 @@ public class MainActivity extends AppCompatActivity {
         mFilterCleaners = findViewById(R.id.filter_cleaners);
         
         mInventoryContainer = findViewById(R.id.inventory_grid_container);
+        mStagedContainer = findViewById(R.id.container_staged_items);
 
         // Profile widgets
         mToolbarProfileInitials = findViewById(R.id.toolbar_profile_initials);
@@ -220,12 +264,26 @@ public class MainActivity extends AppCompatActivity {
             mFirestore = FirebaseFirestore.getInstance();
             if (mFirestore != null) {
                 isFirebaseAvailable = true;
-                // Query group matching our design system invite token STSH9X
                 mGroupRef = mFirestore.collection("groups").document("STSH9X");
             }
         } catch (Throwable t) {
             isFirebaseAvailable = false;
         }
+    }
+
+    private void initGroq() {
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+        OkHttpClient client = new OkHttpClient.Builder()
+                .addInterceptor(logging)
+                .build();
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl("https://api.groq.com/openai/")
+                .addConverterFactory(MoshiConverterFactory.create())
+                .client(client)
+                .build();
+        mGroqService = retrofit.create(GroqService.class);
     }
 
     private void setupNavigationListeners() {
@@ -237,7 +295,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void switchTab(int tabIndex) {
-        // Reset all views & tabs to inactive neutral colors
         if (mDashboardView != null) mDashboardView.setVisibility(View.GONE);
         if (mInventoryView != null) mInventoryView.setVisibility(View.GONE);
         if (mGroupView != null) mGroupView.setVisibility(View.GONE);
@@ -297,15 +354,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupDashboardListeners() {
         if (mBtnTileLog != null) {
-            mBtnTileLog.setOnClickListener(v -> {
-                showScanOptionsBottomSheet();
-            });
+            mBtnTileLog.setOnClickListener(v -> showScanOptionsBottomSheet());
         }
 
         if (mBtnTileAnalysis != null) {
-            mBtnTileAnalysis.setOnClickListener(v -> {
-                showDetailedAnalysis();
-            });
+            mBtnTileAnalysis.setOnClickListener(v -> showDetailedAnalysis());
         }
     }
 
@@ -329,20 +382,13 @@ public class MainActivity extends AppCompatActivity {
         if (mSearchBar != null) {
             mSearchBar.addTextChangedListener(new android.text.TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    // Search filtering logic can go here
-                }
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                 @Override public void afterTextChanged(android.text.Editable s) {}
             });
         }
 
         View.OnClickListener filterClick = v -> {
-            String category = "All";
             int id = v.getId();
-            if (id == R.id.filter_food) category = "Food";
-            else if (id == R.id.filter_medicine) category = "Medicine";
-            else if (id == R.id.filter_cleaners) category = "Cleaners";
-            
             updateFilterUI(id);
         };
 
@@ -386,13 +432,9 @@ public class MainActivity extends AppCompatActivity {
             new AlertDialog.Builder(this)
                     .setTitle(title)
                     .setMessage(desc)
-                    .setPositiveButton("Edit", (d, w) -> {
-                        // Open mock edit
-                        showEditActivityDialog(v);
-                    })
+                    .setPositiveButton("Edit", (d, w) -> showEditActivityDialog(v))
                     .setNegativeButton("Delete", (d, w) -> {
                         v.setVisibility(View.GONE);
-                        // Find the divider below it and hide it too
                         View parent = (View) v.getParent();
                         if (parent instanceof LinearLayout) {
                             int index = ((LinearLayout) parent).indexOfChild(v);
@@ -427,7 +469,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupGroupListeners() {
-        // Dynamic clipboard copy trigger
         if (mWrapCopyInvite != null) {
             mWrapCopyInvite.setOnClickListener(v -> {
                 if (mGroupInviteCode == null) return;
@@ -436,7 +477,6 @@ public class MainActivity extends AppCompatActivity {
                 ClipData clip = ClipData.newPlainText("Stashly Invite Code", code);
                 if (clipboard != null) {
                     clipboard.setPrimaryClip(clip);
-                    // Use Snackbar for non-intrusive feedback
                     com.google.android.material.snackbar.Snackbar.make(v, "Code " + code + " copied!", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show();
                 }
             });
@@ -453,9 +493,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (mBtnAddMemberMock != null) {
-            mBtnAddMemberMock.setOnClickListener(v -> {
-                showAddMemberDialog();
-            });
+            mBtnAddMemberMock.setOnClickListener(v -> showAddMemberDialog());
         }
     }
 
@@ -464,7 +502,7 @@ public class MainActivity extends AppCompatActivity {
         input.setHint("Name or Email");
         new AlertDialog.Builder(this)
                 .setTitle("Invite Member")
-                .setMessage("Enter the identifier for the person you want to add. They will see the invite when they join this group code.")
+                .setMessage("Enter the identifier for the person you want to add.")
                 .setView(input)
                 .setPositiveButton("Send Invite", (d, w) -> {
                     String identifier = input.getText().toString();
@@ -519,32 +557,26 @@ public class MainActivity extends AppCompatActivity {
         nameTv.setTextSize(11);
         
         memberLayout.addView(nameTv);
-        
-        // Add before the "Add" button
         mMembersContainer.addView(memberLayout, mMembersContainer.getChildCount() - 1);
     }
 
     private void setupSettingsListeners() {
-        // Logout configuration
         if (mBtnLogout != null) {
-            mBtnLogout.setOnClickListener(v -> {
-                new AlertDialog.Builder(this)
-                        .setTitle("Log Out")
-                        .setMessage("Are you sure you want to sign out?")
-                        .setPositiveButton("Yes", (d, w) -> {
-                            if (isFirebaseAvailable && mAuth != null) {
-                                mAuth.signOut();
-                            }
-                            Intent intent = new Intent(MainActivity.this, AuthActivity.class);
-                            startActivity(intent);
-                            finish();
-                        })
-                        .setNegativeButton("No", null)
-                        .show();
-            });
+            mBtnLogout.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Log Out")
+                    .setMessage("Are you sure you want to sign out?")
+                    .setPositiveButton("Yes", (d, w) -> {
+                        if (isFirebaseAvailable && mAuth != null) {
+                            mAuth.signOut();
+                        }
+                        Intent intent = new Intent(MainActivity.this, AuthActivity.class);
+                        startActivity(intent);
+                        finish();
+                    })
+                    .setNegativeButton("No", null)
+                    .show());
         }
 
-        // Join Group Sync
         if (mBtnJoinGroup != null) {
             mBtnJoinGroup.setOnClickListener(v -> {
                 if (mInputActiveGroupCode == null) return;
@@ -553,10 +585,8 @@ public class MainActivity extends AppCompatActivity {
                     mInputActiveGroupCode.setError("Code required");
                     return;
                 }
-                
                 mInviteCode = newCode;
                 if (mGroupInviteCode != null) mGroupInviteCode.setText(newCode);
-                
                 if (isFirebaseAvailable && mFirestore != null) {
                     if (mGroupListener != null) mGroupListener.remove();
                     mGroupRef = mFirestore.collection("groups").document(newCode);
@@ -566,7 +596,6 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // Numerical workspace Cap adjustment
         if (mBtnSaveSettings != null) {
             mBtnSaveSettings.setOnClickListener(v -> {
                 if (mInputGroupBudgetCap == null || mSettingsCurrentCapLbl == null) return;
@@ -578,42 +607,18 @@ public class MainActivity extends AppCompatActivity {
 
                 double capValue = Double.parseDouble(capText);
                 mCurrentBudgetCap = capValue;
-                String updatedLbl = "Current limit: $" + String.format("%.0f", capValue) + "/month";
-                mSettingsCurrentCapLbl.setText(updatedLbl);
-
-                // Fetch and set on dashboard too
+                mSettingsCurrentCapLbl.setText("Current limit: $" + String.format("%.0f", capValue) + "/month");
                 if (mDashboardBudgetAllocated != null) {
                     mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", capValue));
                 }
                 updateRatioBar();
 
-                // Synchronize asynchronously to Firebase Firestore database
                 if (isFirebaseAvailable && mGroupRef != null) {
                     Map<String, Object> updates = new HashMap<>();
                     updates.put("budgetCap", capValue);
                     mGroupRef.update(updates)
-                        .addOnSuccessListener(aVoid -> Toast.makeText(MainActivity.this, "\u2601\ufe0f Budget cap synced to cloud!", Toast.LENGTH_SHORT).show())
-                        .addOnFailureListener(e -> Toast.makeText(MainActivity.this, "Local update saved.", Toast.LENGTH_SHORT).show());
-                } else {
-                    Toast.makeText(this, "Local configurations saved successfully!", Toast.LENGTH_SHORT).show();
+                        .addOnSuccessListener(aVoid -> Toast.makeText(MainActivity.this, "Budget cap synced!", Toast.LENGTH_SHORT).show());
                 }
-            });
-        }
-
-        // Preference Switch toasts
-        if (mSwitchPref1 != null) {
-            mSwitchPref1.setOnCheckedChangeListener((b, checked) -> {
-                // Update local preference simulation
-            });
-        }
-        if (mSwitchPref2 != null) {
-            mSwitchPref2.setOnCheckedChangeListener((b, checked) -> {
-                // Update local preference simulation
-            });
-        }
-        if (mSwitchPref3 != null) {
-            mSwitchPref3.setOnCheckedChangeListener((b, checked) -> {
-                // Update local preference simulation
             });
         }
     }
@@ -629,7 +634,7 @@ public class MainActivity extends AppCompatActivity {
         
         view.findViewById(R.id.option_camera).setOnClickListener(v -> {
             dialog.dismiss();
-            triggerCameraScanSimulation();
+            triggerCameraScan();
         });
         
         view.findViewById(R.id.option_file).setOnClickListener(v -> {
@@ -656,23 +661,7 @@ public class MainActivity extends AppCompatActivity {
                     String priceStr = priceInput.getText().toString();
                     if (!name.isEmpty() && !priceStr.isEmpty()) {
                         double price = Double.parseDouble(priceStr);
-                        
-                        if (isFirebaseAvailable && mGroupRef != null) {
-                            Map<String, Object> item = new HashMap<>();
-                            item.put("name", name);
-                            item.put("price", price);
-                            item.put("category", "General");
-                            item.put("emoji", "📦");
-                            
-                            mGroupRef.collection("items").add(item);
-                            mGroupRef.update("budgetSpent", FieldValue.increment(price));
-                            mGroupRef.update("activeAssetsValue", FieldValue.increment(price));
-                        } else {
-                            mCurrentBudgetSpent += price;
-                            mActiveAssetsValue += price;
-                            applyLocalMockData();
-                        }
-                        
+                        confirmStagedItem(name, price, "General", "📦");
                         switchTab(2);
                     }
                 })
@@ -680,138 +669,202 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void triggerCameraScanSimulation() {
-        // Show a progress dialog instead of Toast
-        AlertDialog progress = new AlertDialog.Builder(this)
-                .setTitle("Scanning...")
-                .setMessage("ML Kit is analyzing receipt...")
-                .setCancelable(false)
-                .show();
+    private void triggerCameraScan() {
+        Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(takePictureIntent, 102);
+        } else {
+            Toast.makeText(this, "Camera not available", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void analyzeReceipt(Bitmap bitmap) {
+        if (GROQ_API_KEY == null || GROQ_API_KEY.isEmpty() || GROQ_API_KEY.contains("PASTE_YOUR")) {
+            Toast.makeText(this, "Please set your Groq API Key in the .env file", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Toast.makeText(this, "AI analyzing receipt...", Toast.LENGTH_SHORT).show();
+
+        // Convert bitmap to Base64
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream);
+        byte[] byteArray = byteArrayOutputStream.toByteArray();
+        String encodedImage = Base64.encodeToString(byteArray, Base64.NO_WRAP);
+        String dataUrl = "data:image/jpeg;base64," + encodedImage;
+
+        GroqService.GroqRequest.Content textContent = new GroqService.GroqRequest.Content("text", "Analyze this receipt image and return a JSON object with a key 'items' containing an array of items. Each item should have 'name' (string) and 'price' (number). Only return the JSON object, no extra text.");
+        GroqService.GroqRequest.Content imageContent = new GroqService.GroqRequest.Content("image_url", new GroqService.GroqRequest.ImageUrl(dataUrl));
         
-        new Handler().postDelayed(() -> {
-            progress.dismiss();
-            
-            double simulatedPrice = 17.49;
-            if (isFirebaseAvailable && mGroupRef != null) {
-                Map<String, Object> item = new HashMap<>();
-                item.put("name", "Milk & Towels");
-                item.put("price", simulatedPrice);
-                item.put("category", "Groceries");
-                item.put("emoji", "🛒");
-                
-                mGroupRef.collection("items").add(item);
-                mGroupRef.update("budgetSpent", FieldValue.increment(simulatedPrice));
-                mGroupRef.update("activeAssetsValue", FieldValue.increment(simulatedPrice));
-            } else {
-                mCurrentBudgetSpent += simulatedPrice;
-                mActiveAssetsValue += simulatedPrice;
-                applyLocalMockData();
+        GroqService.GroqRequest.Message message = new GroqService.GroqRequest.Message("user", java.util.Arrays.asList(textContent, imageContent));
+        GroqService.GroqRequest request = new GroqService.GroqRequest("meta-llama/llama-4-scout-17b-16e-instruct", java.util.Collections.singletonList(message));
+
+        mGroqService.generateContent("Bearer " + GROQ_API_KEY, request).enqueue(new Callback<GroqService.GroqResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<GroqService.GroqResponse> call, @NonNull Response<GroqService.GroqResponse> response) {
+                if (response.isSuccessful() && response.body() != null && !response.body().choices.isEmpty()) {
+                    String text = response.body().choices.get(0).message.content;
+                    runOnUiThread(() -> parseAiTextToStagedItems(text));
+                } else {
+                    String errorBody = "Unknown error";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorBody = response.errorBody().string();
+                        }
+                        Log.e("Groq", "AI Error: " + response.code() + " - " + errorBody);
+                    } catch (IOException e) {
+                        Log.e("Groq", "AI Error: " + response.code());
+                    }
+
+                    String finalErrorBody = errorBody;
+                    runOnUiThread(() -> {
+                        if (finalErrorBody.contains("model_decommissioned")) {
+                            Toast.makeText(MainActivity.this, "Model decommissioned. Check model ID.", Toast.LENGTH_LONG).show();
+                        } else {
+                            Toast.makeText(MainActivity.this, "AI failed: " + response.code(), Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
             }
-            
+
+            @Override
+            public void onFailure(@NonNull Call<GroqService.GroqResponse> call, @NonNull Throwable t) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "AI Error: " + t.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void parseAiTextToStagedItems(String text) {
+        try {
+            String jsonStr = text.replaceAll("```json", "").replaceAll("```", "").trim();
+            JSONObject root = new JSONObject(jsonStr);
+            JSONArray array = root.getJSONArray("items");
+            mStagedItems.clear();
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject obj = array.getJSONObject(i);
+                String name = obj.getString("name");
+                double price = obj.getDouble("price");
+                mStagedItems.add(new StagedItem(name, price, "General", "📦"));
+            }
+            renderStagingArea();
             switchTab(2);
-        }, 1200);
+        } catch (Exception e) {
+            Log.e("Groq", "Parsing error: " + text, e);
+            Toast.makeText(this, "Failed to parse receipt data.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void renderStagingArea() {
+        if (mStagedContainer == null) return;
+        mStagedContainer.removeAllViews();
+
+        for (int i = 0; i < mStagedItems.size(); i++) {
+            final int index = i;
+            StagedItem item = mStagedItems.get(i);
+            View row = LayoutInflater.from(this).inflate(R.layout.item_staged_receipt, mStagedContainer, false);
+
+            TextView nameTv = row.findViewById(R.id.staged_item_name);
+            TextView priceTv = row.findViewById(R.id.staged_item_price);
+            TextView emojiTv = row.findViewById(R.id.staged_item_emoji);
+            TextView categoryTv = row.findViewById(R.id.staged_item_category);
+            
+            nameTv.setText(item.name);
+            priceTv.setText("$" + String.format("%.2f", item.price));
+            emojiTv.setText(item.emoji);
+            categoryTv.setText(item.category);
+
+            row.findViewById(R.id.btn_confirm_staged).setOnClickListener(v -> {
+                confirmStagedItem(item.name, item.price, item.category, item.emoji);
+                mStagedItems.remove(index);
+                renderStagingArea();
+            });
+
+            mStagedContainer.addView(row);
+            if (i < mStagedItems.size() - 1) {
+                View divider = new View(this);
+                divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+                divider.setBackgroundColor(getResources().getColor(R.color.border_gray));
+                mStagedContainer.addView(divider);
+            }
+        }
+    }
+
+    private void confirmStagedItem(String name, double price, String category, String emoji) {
+        if (isFirebaseAvailable && mGroupRef != null) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("name", name);
+            item.put("price", price);
+            item.put("category", category);
+            item.put("emoji", emoji);
+
+            mGroupRef.collection("items").add(item);
+            mGroupRef.update("budgetSpent", FieldValue.increment(price));
+            mGroupRef.update("activeAssetsValue", FieldValue.increment(price));
+            mGroupRef.update("liquidCash", FieldValue.increment(-price));
+            Toast.makeText(this, name + " added to Stash!", Toast.LENGTH_SHORT).show();
+        } else {
+            mCurrentBudgetSpent += price;
+            mActiveAssetsValue += price;
+            mLiquidCash -= price;
+            applyLocalMockData();
+            Toast.makeText(this, name + " added (Local Mode)", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 101 && resultCode == RESULT_OK) {
-            Toast.makeText(this, "Receipt uploaded! Processing...", Toast.LENGTH_SHORT).show();
-            
-            new Handler().postDelayed(() -> {
-                double simulatedPrice = 24.50;
-                if (isFirebaseAvailable && mGroupRef != null) {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("name", "Imported Goods");
-                    item.put("price", simulatedPrice);
-                    item.put("category", "General");
-                    item.put("emoji", "📄");
-                    
-                    mGroupRef.collection("items").add(item);
-                    mGroupRef.update("budgetSpent", FieldValue.increment(simulatedPrice));
-                    mGroupRef.update("activeAssetsValue", FieldValue.increment(simulatedPrice));
-                } else {
-                    mCurrentBudgetSpent += simulatedPrice;
-                    mActiveAssetsValue += simulatedPrice;
-                    applyLocalMockData();
+        if (resultCode == RESULT_OK) {
+            if (requestCode == 101 && data != null && data.getData() != null) {
+                try {
+                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), data.getData());
+                    analyzeReceipt(bitmap);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                switchTab(2);
-            }, 1000);
+            } else if (requestCode == 102 && data != null && data.getExtras() != null) {
+                Bitmap bitmap = (Bitmap) data.getExtras().get("data");
+                if (bitmap != null) analyzeReceipt(bitmap);
+            }
         }
     }
 
     private void applyLocalMockData() {
         try {
-            if (mInputGroupBudgetCap != null) {
-                mInputGroupBudgetCap.setText(String.format("%.0f", mCurrentBudgetCap));
-            }
-            if (mSettingsCurrentCapLbl != null) {
-                mSettingsCurrentCapLbl.setText("Current limit: $" + String.format("%.0f", mCurrentBudgetCap) + "/month");
-            }
-            if (mDashboardBudgetAllocated != null) {
-                mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", mCurrentBudgetCap));
-            }
-            if (mDashboardBudgetSpentLbl != null) {
-                mDashboardBudgetSpentLbl.setText("$" + String.format("%,.0f", mCurrentBudgetSpent));
-            }
-            if (mDashboardAssetsVal != null) {
-                mDashboardAssetsVal.setText("$" + String.format("%,.2f", mActiveAssetsValue));
-            }
-            if (mDashboardLiquidVal != null) {
-                mDashboardLiquidVal.setText("$" + String.format("%,.2f", mLiquidCash));
-            }
+            if (mInputGroupBudgetCap != null) mInputGroupBudgetCap.setText(String.format("%.0f", mCurrentBudgetCap));
+            if (mSettingsCurrentCapLbl != null) mSettingsCurrentCapLbl.setText("Current limit: $" + String.format("%.0f", mCurrentBudgetCap) + "/month");
+            if (mDashboardBudgetAllocated != null) mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", mCurrentBudgetCap));
+            if (mDashboardBudgetSpentLbl != null) mDashboardBudgetSpentLbl.setText("$" + String.format("%,.0f", mCurrentBudgetSpent));
+            if (mDashboardAssetsVal != null) mDashboardAssetsVal.setText("$" + String.format("%,.2f", mActiveAssetsValue));
+            if (mDashboardLiquidVal != null) mDashboardLiquidVal.setText("$" + String.format("%,.2f", mLiquidCash));
             
             TextView groupTitle = findViewById(R.id.group_workspace_title);
             if (groupTitle != null) groupTitle.setText(mWorkspaceName);
-            
             updateRatioBar();
-        } catch (Throwable t) {
-            // Safe fallback
-        }
+        } catch (Throwable t) {}
     }
 
     private void fetchGroupData() {
         if (isFirebaseAvailable && mGroupRef != null) {
-            try {
-                // Listen to Group Metadata (Budget, Members, etc.)
-                mGroupListener = mGroupRef.addSnapshotListener((snapshot, e) -> {
-                    try {
-                        if (e != null || snapshot == null || !snapshot.exists()) {
-                            // Document empty/missing but firebase connected. Safely initialize.
-                            if (snapshot != null && !snapshot.exists()) {
-                                provisionFirestoreDefaults();
-                            }
-                            applyLocalMockData();
-                            return;
-                        }
-                        
-                        mCurrentBudgetCap = snapshot.getDouble("budgetCap") != null ? snapshot.getDouble("budgetCap") : 10000.0;
-                        mCurrentBudgetSpent = snapshot.getDouble("budgetSpent") != null ? snapshot.getDouble("budgetSpent") : 0.0;
-                        mActiveAssetsValue = snapshot.getDouble("activeAssetsValue") != null ? snapshot.getDouble("activeAssetsValue") : 0.0;
-                        mLiquidCash = snapshot.getDouble("liquidCash") != null ? snapshot.getDouble("liquidCash") : 0.0;
-                        mWorkspaceName = snapshot.getString("workspaceName") != null ? snapshot.getString("workspaceName") : "Workspace";
-                        
-                        List<String> members = (List<String>) snapshot.get("members");
-                        if (members != null) {
-                            mMembersList = members;
-                            syncMembersToUI();
-                        }
-                        applyLocalMockData();
-                    } catch (Throwable t) {
-                        applyLocalMockData();
-                    }
-                });
-
-                // Listen to Real Inventory Items
-                mItemsListener = mGroupRef.collection("items").addSnapshotListener((snapshots, e) -> {
-                    if (e != null || snapshots == null) return;
-                    renderInventoryItems(snapshots);
-                });
-
-            } catch (Throwable ex) {
-                isFirebaseAvailable = false;
+            mGroupListener = mGroupRef.addSnapshotListener((snapshot, e) -> {
+                if (e != null || snapshot == null || !snapshot.exists()) {
+                    if (snapshot != null && !snapshot.exists()) provisionFirestoreDefaults();
+                    applyLocalMockData();
+                    return;
+                }
+                mCurrentBudgetCap = snapshot.getDouble("budgetCap") != null ? snapshot.getDouble("budgetCap") : 10000.0;
+                mCurrentBudgetSpent = snapshot.getDouble("budgetSpent") != null ? snapshot.getDouble("budgetSpent") : 0.0;
+                mActiveAssetsValue = snapshot.getDouble("activeAssetsValue") != null ? snapshot.getDouble("activeAssetsValue") : 0.0;
+                mLiquidCash = snapshot.getDouble("liquidCash") != null ? snapshot.getDouble("liquidCash") : 0.0;
+                mWorkspaceName = snapshot.getString("workspaceName") != null ? snapshot.getString("workspaceName") : "Workspace";
+                List<String> members = (List<String>) snapshot.get("members");
+                if (members != null) { mMembersList = members; syncMembersToUI(); }
                 applyLocalMockData();
-            }
+            });
+            mItemsListener = mGroupRef.collection("items").addSnapshotListener((snapshots, e) -> {
+                if (e != null || snapshots == null) return;
+                renderInventoryItems(snapshots);
+            });
         } else {
             applyLocalMockData();
         }
@@ -833,10 +886,8 @@ public class MainActivity extends AppCompatActivity {
     private void renderInventoryItems(com.google.firebase.firestore.QuerySnapshot snapshots) {
         if (mInventoryContainer == null) return;
         mInventoryContainer.removeAllViews();
-        
         float density = getResources().getDisplayMetrics().density;
         LinearLayout currentRow = null;
-
         int count = 0;
         for (QueryDocumentSnapshot doc : snapshots) {
             String name = doc.getString("name");
@@ -844,26 +895,21 @@ public class MainActivity extends AppCompatActivity {
             String category = doc.getString("category");
             String emoji = doc.getString("emoji");
             if (emoji == null) emoji = "📦";
-
             if (count % 2 == 0) {
                 currentRow = new LinearLayout(this);
                 currentRow.setOrientation(LinearLayout.HORIZONTAL);
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                 rowParams.setMargins(0, 0, 0, (int) (12 * density));
                 currentRow.setLayoutParams(rowParams);
                 mInventoryContainer.addView(currentRow);
             }
-
-            View card = createInventoryCard(doc.getId(), name, price, category, emoji);
-            currentRow.addView(card);
+            currentRow.addView(createInventoryCard(doc.getId(), name, price, category, emoji));
             count++;
         }
     }
 
     private View createInventoryCard(String id, String name, Double price, String category, String emoji) {
         float density = getResources().getDisplayMetrics().density;
-        
         LinearLayout card = new LinearLayout(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
         card.setLayoutParams(params);
@@ -891,128 +937,71 @@ public class MainActivity extends AppCompatActivity {
         priceTv.setTextSize(11);
         card.addView(priceTv);
 
-        card.setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle(name)
-                    .setMessage("Remove this item from stash?")
-                    .setPositiveButton("Remove / Consume", (d, w) -> {
-                        mGroupRef.collection("items").document(id).delete();
-                        // Update group totals
-                        mGroupRef.update("activeAssetsValue", FieldValue.increment(-(price != null ? price : 0.0)));
-                    })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-        });
+        card.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle(name)
+                .setMessage("Remove this item from stash?")
+                .setPositiveButton("Remove / Consume", (d, w) -> {
+                    mGroupRef.collection("items").document(id).delete();
+                    mGroupRef.update("activeAssetsValue", FieldValue.increment(-(price != null ? price : 0.0)));
+                })
+                .setNegativeButton("Cancel", null)
+                .show());
 
         return card;
     }
 
     private void syncMembersToUI() {
         if (mMembersContainer == null) return;
-        
-        // Clear dynamic members (keep Alex at 0 and Add button at end)
         int childCount = mMembersContainer.getChildCount();
-        if (childCount > 2) {
-            mMembersContainer.removeViews(1, childCount - 2);
-        }
-        
-        for (String member : mMembersList) {
-            addMemberToUI(member);
-        }
+        if (childCount > 2) mMembersContainer.removeViews(1, childCount - 2);
+        for (String member : mMembersList) addMemberToUI(member);
     }
 
     private void updateProfileUI() {
         FirebaseUser user = (mAuth != null) ? mAuth.getCurrentUser() : null;
-        String name = "Alex";
-        String email = "alex@brohousecrew.com";
-        String initials = "AL";
-
+        String name = "Alex", email = "alex@brohousecrew.com", initials = "AL";
         if (user != null) {
-            if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
-                name = user.getDisplayName();
-            } else if (user.getEmail() != null) {
-                name = user.getEmail().split("@")[0];
-            }
-            if (user.getEmail() != null) {
-                email = user.getEmail();
-            }
-
-            // Generate initials
+            name = (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) ? user.getDisplayName() : user.getEmail().split("@")[0];
+            email = user.getEmail();
             String[] parts = name.split(" ");
             if (parts.length > 0 && !parts[0].isEmpty()) {
                 initials = String.valueOf(parts[0].charAt(0));
-                if (parts.length > 1 && !parts[1].isEmpty()) {
-                    initials += String.valueOf(parts[1].charAt(0));
-                }
-            } else {
-                initials = "U";
-            }
+                if (parts.length > 1 && !parts[1].isEmpty()) initials += String.valueOf(parts[1].charAt(0));
+            } else initials = "U";
             initials = initials.toUpperCase();
         }
-
         if (mToolbarProfileInitials != null) mToolbarProfileInitials.setText(initials);
         if (mSettingsProfileInitials != null) mSettingsProfileInitials.setText(initials);
         if (mSettingsProfileName != null) mSettingsProfileName.setText(name);
         if (mSettingsProfileEmail != null) mSettingsProfileEmail.setText(email);
-        
-        // Update Alex in members list
         if (mMemberAlexInitials != null) mMemberAlexInitials.setText(initials);
         if (mMemberAlexName != null) mMemberAlexName.setText(name);
+        TextView greeting = findViewById(R.id.greeting_text);
+        if (greeting != null) greeting.setText("Good morning, " + name);
     }
 
     private void updateRatioBar() {
         if (mDashboardProgressFill == null || mDashboardUtilizationLbl == null) return;
-        
         double ratio = (mCurrentBudgetSpent / mCurrentBudgetCap) * 100.0;
         if (ratio > 100.0) ratio = 100.0;
-        
         mDashboardUtilizationLbl.setText(String.format("%.1f", ratio) + "% Utilized");
-        
         mDashboardProgressFill.post(() -> {
             try {
                 View parent = (View) mDashboardProgressFill.getParent();
                 if (parent != null) {
-                    int parentWidth = parent.getWidth();
-                    if (parentWidth <= 0) {
-                        parentWidth = parent.getMeasuredWidth();
-                    }
+                    int parentWidth = parent.getWidth() > 0 ? parent.getWidth() : parent.getMeasuredWidth();
                     double percent = (mCurrentBudgetSpent / mCurrentBudgetCap);
-                    if (percent > 1.0) percent = 1.0;
-                    if (percent < 0.0) percent = 0.0;
-                    
+                    if (percent > 1.0) percent = 1.0; if (percent < 0.0) percent = 0.0;
                     android.view.ViewGroup.LayoutParams params = mDashboardProgressFill.getLayoutParams();
-                    if (params != null) {
-                        params.width = (int) (parentWidth * percent);
-                        mDashboardProgressFill.setLayoutParams(params);
-                    }
-                    
-                    // Programmatic color transition: red if budget exceeded, otherwise blue/green
-                    if (percent >= 0.9) {
-                        mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.urgency_red));
-                        mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.urgency_red));
-                    } else {
-                        mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.accent_blue));
-                        mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.text_muted));
-                    }
+                    if (params != null) { params.width = (int) (parentWidth * percent); mDashboardProgressFill.setLayoutParams(params); }
+                    if (percent >= 0.9) { mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.urgency_red)); mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.urgency_red)); }
+                    else { mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.accent_blue)); mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.text_muted)); }
                 }
-            } catch (Exception e) {
-                // Prevent any layout exceptions from crashing the app
-            }
+            } catch (Exception e) {}
         });
     }
 
-    // Needed to modify this label from outside SNAPSHOT updates
     private TextView mDashboardBudgetAllocated;
-    
     @Override
-    protected void onResume() {
-        super.onResume();
-        try {
-            // Fallback safety to map widgets in case snapshot isn't triggered
-            mDashboardBudgetAllocated = findViewById(R.id.dashboard_budget_allocated);
-            applyLocalMockData();
-        } catch (Throwable t) {
-            // Safe fallback
-        }
-    }
+    protected void onResume() { super.onResume(); try { mDashboardBudgetAllocated = findViewById(R.id.dashboard_budget_allocated); applyLocalMockData(); } catch (Throwable t) {} }
 }

@@ -91,7 +91,7 @@
                             android:textStyle="italic" />-->
 
                         <TextView
-
+                            android:id="@+id/greeting_text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Greetings, Alex"
@@ -594,6 +594,7 @@
 
                 <!-- Verification staging rows contained in card -->
                 <LinearLayout
+                    android:id="@+id/container_staged_items"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="@drawable/card_background"
@@ -602,186 +603,8 @@
                     android:elevation="2dp"
                     android:layout_marginBottom="16dp">
 
-                    <!-- Verification Row 1 -->
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
+                    <!-- Dynamic rows will be added here -->
 
-                        <TextView
-                            android:id="@+id/stage_avatar_1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="🥛"
-                            android:textSize="26dp"
-                            android:layout_centerVertical="true" />
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_toEndOf="@id/stage_avatar_1"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Organic Whole Milk"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:layout_marginTop="2dp"
-                                android:gravity="center_vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Groceries"
-                                    android:background="@drawable/tag_green_tint"
-                                    android:textColor="@color/growth_green"
-                                    android:textSize="10dp"
-                                    android:paddingHorizontal="6dp"
-                                    android:paddingVertical="2dp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" • qty: 1 Gallon"
-                                    android:textColor="@color/text_muted"
-                                    android:textSize="11dp" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <!-- Price and verification checked circle -->
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="$4.99"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                android:layout_marginEnd="12dp" />
-
-                            <!-- Check circle -->
-                            <TextView
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
-                                android:background="@drawable/tag_green_tint"
-                                android:text="✓"
-                                android:textColor="@color/growth_green"
-                                android:textStyle="bold"
-                                android:gravity="center" />
-                        </LinearLayout>
-                    </RelativeLayout>
-
-                    <!-- Divider -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/black"
-                        android:alpha="0.05" />
-
-                    <!-- Verification Row 2 -->
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp">
-
-                        <TextView
-                            android:id="@+id/stage_avatar_2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="🧻"
-                            android:textSize="26dp"
-                            android:layout_centerVertical="true" />
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_toEndOf="@id/stage_avatar_2"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Bounty Paper Towels"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:layout_marginTop="2dp"
-                                android:gravity="center_vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Cleaners"
-                                    android:background="@drawable/input_field_background"
-                                    android:textColor="@color/text_muted"
-                                    android:textSize="10dp"
-                                    android:paddingHorizontal="6dp"
-                                    android:paddingVertical="2dp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" • qty: 6 Rolls"
-                                    android:textColor="@color/text_muted"
-                                    android:textSize="11dp" />
-                            </LinearLayout>
-                        </LinearLayout>
-
-                        <!-- Price and verification checked circle -->
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="$12.50"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                android:layout_marginEnd="12dp" />
-
-                            <!-- Check circle -->
-                            <TextView
-                                android:layout_width="28dp"
-                                android:layout_height="28dp"
-                                android:background="@drawable/tag_green_tint"
-                                android:text="✓"
-                                android:textColor="@color/growth_green"
-                                android:textStyle="bold"
-                                android:gravity="center" />
-                        </LinearLayout>
-                    </RelativeLayout>
                 </LinearLayout>
 
                 <!-- Warnings alert card block -->
