@@ -20,6 +20,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -41,10 +42,14 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import okhttp3.OkHttpClient;
@@ -78,10 +83,13 @@ public class MainActivity extends AppCompatActivity {
     // Interactive Dashboard Widgets
     private TextView mDashboardBudgetSpentLbl;
     private TextView mDashboardUtilizationLbl;
-    private View mDashboardProgressFill;
+    private TextView mDashboardAllocatedLbl;
+    private LinearLayout mDashboardProgressContainer;
     private TextView mDashboardAssetsVal;
     private TextView mDashboardLiquidVal;
-    private LinearLayout mBtnTileLog, mBtnTileAnalysis;
+    private TextView mDashboardBudgetAllocated;
+    private TextView mBtnEditBudget;
+    private LinearLayout mBtnTileAllocate, mBtnTileAnalysis, mBtnTileAllocatedFunds;
 
     // Group Widget Elements
     private LinearLayout mWrapCopyInvite;
@@ -89,24 +97,25 @@ public class MainActivity extends AppCompatActivity {
     private Button mBtnInviteAction;
     private LinearLayout mBtnAddMemberMock;
     private LinearLayout mMembersContainer;
+    private LinearLayout mRecentActivityContainer;
 
     // Settings elements
     private Button mBtnLogout;
-    private EditText mInputGroupBudgetCap;
+    private Button mBtnResetSpent;
     private EditText mInputActiveGroupCode;
-    private Button mBtnSaveSettings;
     private Button mBtnJoinGroup;
-    private TextView mSettingsCurrentCapLbl;
-    private SwitchCompat mSwitchPref1, mSwitchPref2, mSwitchPref3;
+    private SwitchCompat mSwitchDarkMode;
+    private android.widget.Spinner mSpinnerLanguage;
 
     // Recent Activity Rows
-    private View mRowActivity1, mRowActivity2, mRowActivity3;
-
     // Inventory Elements for Filtering
     private EditText mSearchBar;
-    private TextView mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners;
+    private TextView mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners, mFilterElectronics, mFilterClothes, mFilterFurniture, mFilterServices, mFilterTools;
     private LinearLayout mInventoryContainer;
     private LinearLayout mStagedContainer;
+
+    // Expiry Widgets
+    private LinearLayout mExpiryContainer;
 
     // Staging Data
     private List<StagedItem> mStagedItems = new ArrayList<>();
@@ -120,12 +129,16 @@ public class MainActivity extends AppCompatActivity {
         double price;
         String category;
         String emoji;
+        String productionDate;
+        String expiryDate;
 
-        StagedItem(String name, double price, String category, String emoji) {
+        StagedItem(String name, double price, String category, String emoji, String productionDate, String expiryDate) {
             this.name = name;
             this.price = price;
             this.category = category;
             this.emoji = emoji;
+            this.productionDate = productionDate;
+            this.expiryDate = expiryDate;
         }
     }
 
@@ -144,12 +157,26 @@ public class MainActivity extends AppCompatActivity {
     // Local state simulation fallbacks
     private double mCurrentBudgetSpent = 4250.0;
     private double mCurrentBudgetCap = 10000.0;
+    private double mBudgetReserved = 0.0;
+    private String mCurrentFilter = "All";
+    private com.google.firebase.firestore.QuerySnapshot mLastInventorySnapshot;
+    private com.google.firebase.firestore.QuerySnapshot mLastActivitiesSnapshot;
     private double mActiveAssetsValue = 2800.0;
     private double mLiquidCash = 5750.0;
     private String mInviteCode = "STSH9X";
     private String mWorkspaceName = "The BroHouse Crew";
 
     private List<String> mMembersList = new ArrayList<>();
+    private List<Map<String, Object>> mAllocationsList = new ArrayList<>();
+    private static final int[] ALLOCATION_COLORS = {
+            0xFF003EC6, // secondary / deep blue
+            0xFF00993B, // growth green
+            0xFFBA1A1A, // urgency red
+            0xFF6200EE, // primary variant
+            0xFF03DAC5, // teal
+            0xFFFFB74D, // orange
+            0xFF9575CD  // purple
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -205,17 +232,15 @@ public class MainActivity extends AppCompatActivity {
         // Dashboard outputs
         mDashboardBudgetSpentLbl = findViewById(R.id.dashboard_budget_spent);
         mDashboardUtilizationLbl = findViewById(R.id.dashboard_utilization_text);
-        mDashboardProgressFill = findViewById(R.id.dashboard_progress_fill);
+        mDashboardAllocatedLbl = findViewById(R.id.dashboard_allocated_text);
+        mDashboardProgressContainer = findViewById(R.id.dashboard_progress_container);
         mDashboardAssetsVal = findViewById(R.id.dashboard_assets_val);
         mDashboardLiquidVal = findViewById(R.id.dashboard_liquid_val);
         mDashboardBudgetAllocated = findViewById(R.id.dashboard_budget_allocated);
-        mBtnTileLog = findViewById(R.id.btn_tile_log);
+        mBtnEditBudget = findViewById(R.id.btn_edit_budget);
+        mBtnTileAllocate = findViewById(R.id.btn_tile_allocate);
         mBtnTileAnalysis = findViewById(R.id.btn_tile_analysis);
-
-        // Recent Activity Rows
-        mRowActivity1 = findViewById(R.id.row_activity_1);
-        mRowActivity2 = findViewById(R.id.row_activity_2);
-        mRowActivity3 = findViewById(R.id.row_activity_3);
+        mBtnTileAllocatedFunds = findViewById(R.id.btn_tile_allocated_funds);
 
         // Inventory Filtering
         mSearchBar = findViewById(R.id.search_bar);
@@ -223,9 +248,16 @@ public class MainActivity extends AppCompatActivity {
         mFilterFood = findViewById(R.id.filter_food);
         mFilterMedicine = findViewById(R.id.filter_medicine);
         mFilterCleaners = findViewById(R.id.filter_cleaners);
+        mFilterElectronics = findViewById(R.id.filter_electronics);
+        mFilterClothes = findViewById(R.id.filter_clothes);
+        mFilterFurniture = findViewById(R.id.filter_furniture);
+        mFilterServices = findViewById(R.id.filter_services);
+        mFilterTools = findViewById(R.id.filter_tools);
         
         mInventoryContainer = findViewById(R.id.inventory_grid_container);
         mStagedContainer = findViewById(R.id.container_staged_items);
+
+        mExpiryContainer = findViewById(R.id.expiry_warning_container);
 
         // Profile widgets
         mToolbarProfileInitials = findViewById(R.id.toolbar_profile_initials);
@@ -243,17 +275,15 @@ public class MainActivity extends AppCompatActivity {
         mBtnInviteAction = findViewById(R.id.btn_invite_action);
         mBtnAddMemberMock = findViewById(R.id.btn_add_member_mock);
         mMembersContainer = findViewById(R.id.container_members);
+        mRecentActivityContainer = findViewById(R.id.container_recent_activities);
 
         // Settings
         mBtnLogout = findViewById(R.id.btn_logout);
-        mInputGroupBudgetCap = findViewById(R.id.input_group_budget_cap);
+        mBtnResetSpent = findViewById(R.id.btn_reset_spent);
         mInputActiveGroupCode = findViewById(R.id.input_active_group_code);
-        mBtnSaveSettings = findViewById(R.id.btn_save_settings);
         mBtnJoinGroup = findViewById(R.id.btn_join_group);
-        mSettingsCurrentCapLbl = findViewById(R.id.settings_current_cap_lbl);
-        mSwitchPref1 = findViewById(R.id.switch_preferences_1);
-        mSwitchPref2 = findViewById(R.id.switch_preferences_2);
-        mSwitchPref3 = findViewById(R.id.switch_preferences_3);
+        mSwitchDarkMode = findViewById(R.id.switch_dark_mode);
+        mSpinnerLanguage = findViewById(R.id.spinner_language);
     }
 
     private TextView mMemberAlexInitials, mMemberAlexName;
@@ -353,29 +383,231 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupDashboardListeners() {
-        if (mBtnTileLog != null) {
-            mBtnTileLog.setOnClickListener(v -> showScanOptionsBottomSheet());
+        if (mBtnEditBudget != null) {
+            mBtnEditBudget.setOnClickListener(v -> showBudgetUpdateDialog());
+        }
+        if (mBtnTileAllocate != null) {
+            mBtnTileAllocate.setOnClickListener(v -> showAllocateBudgetDialog());
         }
 
         if (mBtnTileAnalysis != null) {
             mBtnTileAnalysis.setOnClickListener(v -> showDetailedAnalysis());
         }
+
+        if (mBtnTileAllocatedFunds != null) {
+            mBtnTileAllocatedFunds.setOnClickListener(v -> showAllocationsDetailDialog());
+        }
+    }
+
+    private void showAllocationsDetailDialog() {
+        if (mAllocationsList.isEmpty()) {
+            Toast.makeText(this, "No funds currently allocated.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(60, 40, 60, 40);
+
+        for (int i = 0; i < mAllocationsList.size(); i++) {
+            Map<String, Object> alloc = mAllocationsList.get(i);
+            String title = (String) alloc.get("title");
+            Double amount = 0.0;
+            if (alloc.get("amount") instanceof Double) amount = (Double) alloc.get("amount");
+            else if (alloc.get("amount") instanceof Long) amount = ((Long) alloc.get("amount")).doubleValue();
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, 10, 0, 10);
+
+            TextView titleTv = new TextView(this);
+            titleTv.setText(title);
+            titleTv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+            titleTv.setTextColor(getResources().getColor(R.color.primary));
+            titleTv.setTypeface(null, Typeface.BOLD);
+
+            TextView amountTv = new TextView(this);
+            amountTv.setText(String.format("$%,.2f", amount));
+            amountTv.setTextColor(ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]);
+            amountTv.setTypeface(null, Typeface.BOLD);
+
+            row.addView(titleTv);
+            row.addView(amountTv);
+            container.addView(row);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Allocated Funds Breakdown")
+                .setView(container)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+    private void showAllocateBudgetDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
+        EditText amountInput = dialogView.findViewById(R.id.input_item_price);
+        EditText reasonInput = dialogView.findViewById(R.id.input_item_name);
+        
+        // Hide irrelevant fields
+        dialogView.findViewById(R.id.layout_category_selection).setVisibility(View.GONE);
+        dialogView.findViewById(R.id.layout_date_selection).setVisibility(View.GONE);
+
+        reasonInput.setHint("What are you allocating for? (e.g. Travel)");
+        amountInput.setHint("Enter amount to allocate");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Allocate Monthly Budget")
+                .setView(dialogView)
+                .setPositiveButton("Allocate", (d, w) -> {
+                    String reason = reasonInput.getText().toString().trim();
+                    String amountStr = amountInput.getText().toString().trim();
+                    if (!reason.isEmpty() && !amountStr.isEmpty()) {
+                        try {
+                            double amount = Double.parseDouble(amountStr);
+                            
+                            if (isFirebaseAvailable && mGroupRef != null) {
+                                Map<String, Object> allocation = new HashMap<>();
+                                allocation.put("title", reason);
+                                allocation.put("amount", amount);
+                                mGroupRef.update("budgetReserved", FieldValue.increment(amount),
+                                               "allocations", FieldValue.arrayUnion(allocation));
+                                
+                                // Log activity
+                                Map<String, Object> activity = new HashMap<>();
+                                activity.put("title", "Budget Allocation");
+                                activity.put("desc", "Reserved $" + amount + " for " + reason);
+                                activity.put("amount", 0.0);
+                                activity.put("emoji", "🎯");
+                                activity.put("timestamp", FieldValue.serverTimestamp());
+                                mGroupRef.collection("activities").add(activity);
+                            } else {
+                                mBudgetReserved += amount;
+                                Map<String, Object> localAlloc = new HashMap<>();
+                                localAlloc.put("title", reason);
+                                localAlloc.put("amount", amount);
+                                mAllocationsList.add(localAlloc);
+                                updateRatioBar();
+                                Toast.makeText(this, "Allocated $" + amount + " for " + reason + " (Local)", Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (NumberFormatException e) {
+                            Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void showDetailedAnalysis() {
-        String analysisReport = "Q3 Performance Overview:\n\n" +
-                "• Budget Utilization: " + String.format("%.1f%%", (mCurrentBudgetSpent / mCurrentBudgetCap) * 100) + "\n" +
-                "• Asset Appreciation: +4.2% YoY\n" +
-                "• Top Category: Office Equipment (56%)\n" +
-                "• Predicted Waste: $14.50 (Steak expiring)\n\n" +
-                "Recommendation: Reduce liquid cash holdings by 5% to increase asset coverage.";
+        if (!isFirebaseAvailable || mGroupRef == null) {
+            Toast.makeText(this, "Cloud data unavailable for analysis.", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        new AlertDialog.Builder(this)
-                .setTitle("Financial Analysis")
-                .setMessage(analysisReport)
-                .setPositiveButton("Download PDF", (d, w) -> Toast.makeText(this, "Generating Report...", Toast.LENGTH_SHORT).show())
-                .setNegativeButton("Close", null)
-                .show();
+        if (GROQ_API_KEY == null || GROQ_API_KEY.isEmpty() || GROQ_API_KEY.contains("PASTE_YOUR")) {
+            Toast.makeText(this, "AI API Key not configured.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "AI analyzing your stash...", Toast.LENGTH_SHORT).show();
+
+        // 1. Build Data Summary
+        StringBuilder summary = new StringBuilder();
+        summary.append("Financial Overview:\n");
+        summary.append("- Monthly Budget: $").append(mCurrentBudgetCap).append("\n");
+        summary.append("- Budget Spent: $").append(mCurrentBudgetSpent).append("\n");
+        summary.append("- Active Assets Value: $").append(mActiveAssetsValue).append("\n");
+        summary.append("- Liquid Cash remaining: $").append(mLiquidCash).append("\n\n");
+
+        summary.append("Recent Activities:\n");
+        if (mLastActivitiesSnapshot != null) {
+            for (QueryDocumentSnapshot doc : mLastActivitiesSnapshot) {
+                summary.append("- ").append(doc.getString("title")).append(": ")
+                        .append(doc.getString("desc")).append(" (")
+                        .append(doc.getDouble("amount")).append(")\n");
+            }
+        } else {
+            summary.append("No recent activities found.\n");
+        }
+
+        summary.append("\nInventory Status:\n");
+        if (mLastInventorySnapshot != null) {
+            summary.append("- Total items in stash: ").append(mLastInventorySnapshot.size()).append("\n");
+            // Check for expiring items (logic simplified here)
+            int expiringCount = 0;
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            Calendar threshold = Calendar.getInstance();
+            threshold.add(Calendar.DAY_OF_YEAR, 2);
+            for (QueryDocumentSnapshot doc : mLastInventorySnapshot) {
+                String expDateStr = doc.getString("expiryDate");
+                if (expDateStr != null && !expDateStr.isEmpty()) {
+                    try {
+                        Date expDate = sdf.parse(expDateStr);
+                        if (expDate != null && expDate.before(threshold.getTime())) expiringCount++;
+                    } catch (Exception ignored) {}
+                }
+            }
+            summary.append("- Items expiring soon: ").append(expiringCount).append("\n");
+        }
+
+        // 2. Call Groq
+        String prompt = "You are a professional financial and household efficiency advisor. Analyze the following household data and provide: " +
+                "1. A brief analysis of the recent financial trend. " +
+                "2. Specific, actionable advice to reduce unnecessary financial losses or waste. " +
+                "Return the response in JSON format with two keys: 'analysis' (string) and 'advice' (string). Use clear, professional, and encouraging tone.";
+
+        GroqService.GroqRequest.Content textContent = new GroqService.GroqRequest.Content("text", prompt + "\n\nData Summary:\n" + summary.toString());
+        GroqService.GroqRequest.Message message = new GroqService.GroqRequest.Message("user", Collections.singletonList(textContent));
+        GroqService.GroqRequest request = new GroqService.GroqRequest("meta-llama/llama-4-scout-17b-16e-instruct", Collections.singletonList(message));
+
+        mGroqService.generateContent("Bearer " + GROQ_API_KEY, request).enqueue(new Callback<GroqService.GroqResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<GroqService.GroqResponse> call, @NonNull Response<GroqService.GroqResponse> response) {
+                if (response.isSuccessful() && response.body() != null && !response.body().choices.isEmpty()) {
+                    String resultJson = response.body().choices.get(0).message.content;
+                    runOnUiThread(() -> displayAiAnalysis(resultJson));
+                } else {
+                    String errorMsg = "Unknown error";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorMsg = response.errorBody().string();
+                        }
+                    } catch (IOException ignored) {}
+                    Log.e("Groq", "Analysis failed: " + response.code() + " - " + errorMsg);
+                    String finalErrorMsg = errorMsg;
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "AI Analysis failed: " + response.code(), Toast.LENGTH_SHORT).show());
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<GroqService.GroqResponse> call, @NonNull Throwable t) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show());
+            }
+        });
+    }
+
+    private void displayAiAnalysis(String json) {
+        try {
+            JSONObject root = new JSONObject(json.replaceAll("```json", "").replaceAll("```", "").trim());
+            String analysis = root.optString("analysis", "Unable to analyze.");
+            String advice = root.optString("advice", "No specific advice available.");
+
+            View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_analysis_result, null);
+            TextView analysisTv = dialogView.findViewById(R.id.text_analysis_body);
+            TextView adviceTv = dialogView.findViewById(R.id.text_advice_body);
+
+            analysisTv.setText(analysis);
+            adviceTv.setText(advice);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Smart Stash Analysis")
+                    .setView(dialogView)
+                    .setPositiveButton("Got it", null)
+                    .show();
+        } catch (Exception e) {
+            Log.e("Groq", "Analysis parsing error", e);
+            Toast.makeText(this, "AI generated an invalid report format.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void setupInventoryLogic() {
@@ -389,17 +621,115 @@ public class MainActivity extends AppCompatActivity {
 
         View.OnClickListener filterClick = v -> {
             int id = v.getId();
+            if (id == R.id.filter_all) mCurrentFilter = "All";
+            else if (id == R.id.filter_food) mCurrentFilter = "Food";
+            else if (id == R.id.filter_medicine) mCurrentFilter = "Medicine";
+            else if (id == R.id.filter_cleaners) mCurrentFilter = "Cleaners";
+            else if (id == R.id.filter_electronics) mCurrentFilter = "Electronics";
+            else if (id == R.id.filter_clothes) mCurrentFilter = "Clothes";
+            else if (id == R.id.filter_furniture) mCurrentFilter = "Furniture";
+            else if (id == R.id.filter_services) mCurrentFilter = "Services";
+            else if (id == R.id.filter_tools) mCurrentFilter = "Tools & Parts";
+            
             updateFilterUI(id);
+            if (mLastInventorySnapshot != null) renderInventoryItems(mLastInventorySnapshot);
         };
 
         if (mFilterAll != null) mFilterAll.setOnClickListener(filterClick);
         if (mFilterFood != null) mFilterFood.setOnClickListener(filterClick);
         if (mFilterMedicine != null) mFilterMedicine.setOnClickListener(filterClick);
         if (mFilterCleaners != null) mFilterCleaners.setOnClickListener(filterClick);
+        if (mFilterElectronics != null) mFilterElectronics.setOnClickListener(filterClick);
+        if (mFilterClothes != null) mFilterClothes.setOnClickListener(filterClick);
+        if (mFilterFurniture != null) mFilterFurniture.setOnClickListener(filterClick);
+        if (mFilterServices != null) mFilterServices.setOnClickListener(filterClick);
+        if (mFilterTools != null) mFilterTools.setOnClickListener(filterClick);
+    }
+
+    private void renderActivities(com.google.firebase.firestore.QuerySnapshot snapshots) {
+        if (mRecentActivityContainer == null) return;
+        mRecentActivityContainer.removeAllViews();
+        float density = getResources().getDisplayMetrics().density;
+
+        for (QueryDocumentSnapshot doc : snapshots) {
+            String docId = doc.getId();
+            String title = doc.getString("title");
+            String desc = doc.getString("desc");
+            String emoji = doc.getString("emoji");
+            Double amount = doc.getDouble("amount");
+            com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+
+            RelativeLayout row = new RelativeLayout(this);
+            row.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            row.setPadding((int)(16 * density), (int)(12 * density), (int)(16 * density), (int)(12 * density));
+            row.setBackgroundResource(R.drawable.card_background);
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            TextView emojiTv = new TextView(this);
+            emojiTv.setId(View.generateViewId());
+            emojiTv.setText(emoji != null ? emoji : "🔔");
+            emojiTv.setTextSize(22);
+            RelativeLayout.LayoutParams emojiParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            emojiParams.addRule(RelativeLayout.CENTER_VERTICAL);
+            emojiTv.setLayoutParams(emojiParams);
+            row.addView(emojiTv);
+
+            LinearLayout textLayout = new LinearLayout(this);
+            textLayout.setOrientation(LinearLayout.VERTICAL);
+            RelativeLayout.LayoutParams textParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            textParams.addRule(RelativeLayout.END_OF, emojiTv.getId());
+            textParams.setMarginStart((int)(14 * density));
+            textLayout.setLayoutParams(textParams);
+
+            TextView titleTv = new TextView(this);
+            titleTv.setText(title);
+            titleTv.setTextColor(getResources().getColor(R.color.primary));
+            titleTv.setTextSize(14);
+            titleTv.setTypeface(null, Typeface.BOLD);
+            textLayout.addView(titleTv);
+
+            TextView descTv = new TextView(this);
+            String timeStr = ts != null ? android.text.format.DateUtils.getRelativeTimeSpanString(ts.toDate().getTime()).toString() : "Just now";
+            descTv.setText(desc + " • " + timeStr);
+            descTv.setTextColor(getResources().getColor(R.color.text_muted));
+            descTv.setTextSize(11);
+            textLayout.addView(descTv);
+            row.addView(textLayout);
+
+            if (amount != null && amount != 0) {
+                TextView amountTv = new TextView(this);
+                amountTv.setText((amount > 0 ? "+" : "") + String.format("$%,.2f", amount));
+                amountTv.setTextColor(getResources().getColor(amount > 0 ? R.color.growth_green : R.color.urgency_red));
+                amountTv.setTextSize(14);
+                amountTv.setTypeface(null, Typeface.BOLD);
+                RelativeLayout.LayoutParams amountParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                amountParams.addRule(RelativeLayout.ALIGN_PARENT_END);
+                amountParams.addRule(RelativeLayout.CENTER_VERTICAL);
+                amountTv.setLayoutParams(amountParams);
+                row.addView(amountTv);
+                textParams.addRule(RelativeLayout.START_OF, amountTv.getId()); // Avoid overlap
+            }
+
+            row.setOnClickListener(v -> {
+                new AlertDialog.Builder(this)
+                        .setTitle("Delete Activity")
+                        .setMessage("Are you sure you want to remove this notification from the feed?")
+                        .setPositiveButton("Delete", (d, w) -> {
+                            if (isFirebaseAvailable && mGroupRef != null) {
+                                mGroupRef.collection("activities").document(docId).delete();
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            });
+
+            mRecentActivityContainer.addView(row);
+        }
     }
 
     private void updateFilterUI(int activeId) {
-        TextView[] filters = {mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners};
+        TextView[] filters = {mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners, mFilterElectronics, mFilterClothes, mFilterFurniture, mFilterServices, mFilterTools};
         for (TextView f : filters) {
             if (f == null) continue;
             if (f.getId() == activeId) {
@@ -413,59 +743,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupRecentActivityListeners() {
-        View.OnClickListener activityClickListener = v -> {
-            String title = "Activity Details";
-            String desc = "No details available for this item.";
-            
-            int id = v.getId();
-            if (id == R.id.row_activity_1) {
-                title = "MacBook Pro M3 Added";
-                desc = "Office Equipment added to inventory by Alex. \nValue: -$2,400.00 \nCategory: Electronics";
-            } else if (id == R.id.row_activity_2) {
-                title = "Monthly Allocation Reserved";
-                desc = "System automatically allocated $10,000.00 for the October Cycle.";
-            } else if (id == R.id.row_activity_3) {
-                title = "Team Membership";
-                desc = "Sarah joined 'The BroHouse Crew' household workspace.";
-            }
-
-            new AlertDialog.Builder(this)
-                    .setTitle(title)
-                    .setMessage(desc)
-                    .setPositiveButton("Edit", (d, w) -> showEditActivityDialog(v))
-                    .setNegativeButton("Delete", (d, w) -> {
-                        v.setVisibility(View.GONE);
-                        View parent = (View) v.getParent();
-                        if (parent instanceof LinearLayout) {
-                            int index = ((LinearLayout) parent).indexOfChild(v);
-                            if (index + 1 < ((LinearLayout) parent).getChildCount()) {
-                                ((LinearLayout) parent).getChildAt(index + 1).setVisibility(View.GONE);
-                            }
-                        }
-                    })
-                    .setNeutralButton("Close", null)
-                    .show();
-        };
-
-        if (mRowActivity1 != null) mRowActivity1.setOnClickListener(activityClickListener);
-        if (mRowActivity2 != null) mRowActivity2.setOnClickListener(activityClickListener);
-        if (mRowActivity3 != null) mRowActivity3.setOnClickListener(activityClickListener);
+        // No-op for now as rows are dynamic
     }
 
     private void showEditActivityDialog(View row) {
-        EditText input = new EditText(this);
-        input.setHint("Update title...");
-        new AlertDialog.Builder(this)
-                .setTitle("Edit Activity")
-                .setView(input)
-                .setPositiveButton("Save", (d, w) -> {
-                    String newTitle = input.getText().toString();
-                    if (!newTitle.isEmpty()) {
-                        // Implementation for updating title
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
+        // Implementation for updating title
     }
 
     private void setupGroupListeners() {
@@ -577,6 +859,37 @@ public class MainActivity extends AppCompatActivity {
                     .show());
         }
 
+        if (mBtnResetSpent != null) {
+            mBtnResetSpent.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle("Reset Spent Money")
+                    .setMessage("Are you sure you want to reset this month's spending to zero?")
+                    .setPositiveButton("Reset", (d, w) -> {
+                        mCurrentBudgetSpent = 0.0;
+                        if (mDashboardBudgetSpentLbl != null) {
+                            mDashboardBudgetSpentLbl.setText("$0.00");
+                        }
+                        updateRatioBar();
+
+                        if (isFirebaseAvailable && mGroupRef != null) {
+                            mGroupRef.update("budgetSpent", 0.0)
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(MainActivity.this, "Spent money reset!", Toast.LENGTH_SHORT).show();
+
+                                    // Log activity
+                                    Map<String, Object> activity = new HashMap<>();
+                                    activity.put("title", "Budget Reset");
+                                    activity.put("desc", "Spending tracker cleared to zero");
+                                    activity.put("amount", 0.0);
+                                    activity.put("emoji", "🔄");
+                                    activity.put("timestamp", FieldValue.serverTimestamp());
+                                    mGroupRef.collection("activities").add(activity);
+                                });
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
+        }
+
         if (mBtnJoinGroup != null) {
             mBtnJoinGroup.setOnClickListener(v -> {
                 if (mInputActiveGroupCode == null) return;
@@ -596,31 +909,92 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        if (mBtnSaveSettings != null) {
-            mBtnSaveSettings.setOnClickListener(v -> {
-                if (mInputGroupBudgetCap == null || mSettingsCurrentCapLbl == null) return;
-                String capText = mInputGroupBudgetCap.getText().toString().trim();
-                if (capText.isEmpty()) {
-                    mInputGroupBudgetCap.setError("Limit cap value required");
-                    return;
-                }
-
-                double capValue = Double.parseDouble(capText);
-                mCurrentBudgetCap = capValue;
-                mSettingsCurrentCapLbl.setText("Current limit: $" + String.format("%.0f", capValue) + "/month");
-                if (mDashboardBudgetAllocated != null) {
-                    mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", capValue));
-                }
-                updateRatioBar();
-
-                if (isFirebaseAvailable && mGroupRef != null) {
-                    Map<String, Object> updates = new HashMap<>();
-                    updates.put("budgetCap", capValue);
-                    mGroupRef.update(updates)
-                        .addOnSuccessListener(aVoid -> Toast.makeText(MainActivity.this, "Budget cap synced!", Toast.LENGTH_SHORT).show());
+        if (mSwitchDarkMode != null) {
+            mSwitchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) {
+                    androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES);
+                } else {
+                    androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
                 }
             });
         }
+
+        if (mSpinnerLanguage != null) {
+            String[] languages = {"English", "Armenian", "Russian"};
+            android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, languages);
+            mSpinnerLanguage.setAdapter(adapter);
+            mSpinnerLanguage.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+                @Override
+                public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                    if (position > 0) {
+                        Toast.makeText(MainActivity.this, "Language set to " + languages[position], Toast.LENGTH_SHORT).show();
+                    }
+                }
+                @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+            });
+        }
+    }
+
+    private void showBudgetUpdateDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
+        EditText budgetInput = dialogView.findViewById(R.id.input_item_price);
+        EditText nameInput = dialogView.findViewById(R.id.input_item_name);
+        
+        // Hide irrelevant fields for budget update
+        nameInput.setVisibility(View.GONE);
+        dialogView.findViewById(R.id.label_item_name).setVisibility(View.GONE);
+        
+        // Use the new containers to hide extra fields
+        View categoryLayout = dialogView.findViewById(R.id.layout_category_selection);
+        if (categoryLayout != null) categoryLayout.setVisibility(View.GONE);
+        
+        View dateLayout = dialogView.findViewById(R.id.layout_date_selection);
+        if (dateLayout != null) dateLayout.setVisibility(View.GONE);
+
+        budgetInput.setHint("Enter new monthly budget");
+        budgetInput.setText(String.format("%.0f", mCurrentBudgetCap));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Update Monthly Budget")
+                .setView(dialogView)
+                .setPositiveButton("Update", (d, w) -> {
+                    String budgetStr = budgetInput.getText().toString().trim();
+                    if (!budgetStr.isEmpty()) {
+                        try {
+                            double newBudget = Double.parseDouble(budgetStr);
+                            mCurrentBudgetCap = newBudget;
+                            
+                            // Update UI
+                            if (mDashboardBudgetAllocated != null) {
+                                mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", newBudget));
+                            }
+                            updateRatioBar();
+
+                            // Sync to Firebase
+                            if (isFirebaseAvailable && mGroupRef != null) {
+                                Map<String, Object> updates = new HashMap<>();
+                                updates.put("budgetCap", newBudget);
+                                mGroupRef.update(updates)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Toast.makeText(MainActivity.this, "Budget updated!", Toast.LENGTH_SHORT).show();
+                                        
+                                        // Log activity
+                                        Map<String, Object> activity = new HashMap<>();
+                                        activity.put("title", "Budget Updated");
+                                        activity.put("desc", "New monthly limit: $" + newBudget);
+                                        activity.put("amount", 0.0);
+                                        activity.put("emoji", "💰");
+                                        activity.put("timestamp", FieldValue.serverTimestamp());
+                                        mGroupRef.collection("activities").add(activity);
+                                    });
+                            }
+                        } catch (NumberFormatException e) {
+                            Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void showScanOptionsBottomSheet() {
@@ -652,21 +1026,56 @@ public class MainActivity extends AppCompatActivity {
         View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
         EditText nameInput = dialogView.findViewById(R.id.input_item_name);
         EditText priceInput = dialogView.findViewById(R.id.input_item_price);
+        android.widget.Spinner categorySpinner = dialogView.findViewById(R.id.input_item_category);
+        EditText productionDateInput = dialogView.findViewById(R.id.input_item_production_date);
+        EditText expiryDateInput = dialogView.findViewById(R.id.input_item_expiry_date);
+
+        setupDatePicker(productionDateInput);
+        setupDatePicker(expiryDateInput);
+
+        String[] categories = {"Food", "Medicine", "Cleaners", "Electronics", "Clothes", "Furniture", "Services", "Tools & Parts", "General"};
+        String[] emojis = {"🍎", "💊", "🧼", "💻", "👕", "🛋️", "🛠️", "🔧", "📦"};
+        
+        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, categories);
+        categorySpinner.setAdapter(adapter);
 
         new AlertDialog.Builder(this)
                 .setTitle("Manual Asset Entry")
                 .setView(dialogView)
                 .setPositiveButton("Add to Stash", (d, w) -> {
-                    String name = nameInput.getText().toString();
-                    String priceStr = priceInput.getText().toString();
+                    String name = nameInput.getText().toString().trim();
+                    String priceStr = priceInput.getText().toString().trim();
                     if (!name.isEmpty() && !priceStr.isEmpty()) {
-                        double price = Double.parseDouble(priceStr);
-                        confirmStagedItem(name, price, "General", "📦");
-                        switchTab(2);
+                        try {
+                            double price = Double.parseDouble(priceStr);
+                            int selectedIdx = categorySpinner.getSelectedItemPosition();
+                            String category = categories[selectedIdx];
+                            String emoji = emojis[selectedIdx];
+                            String prodDate = productionDateInput.getText().toString();
+                            String expDate = expiryDateInput.getText().toString();
+                            confirmStagedItem(name, price, category, emoji, prodDate, expDate);
+                            switchTab(2);
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Invalid entry", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void setupDatePicker(EditText editText) {
+        editText.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            int year = calendar.get(Calendar.YEAR);
+            int month = calendar.get(Calendar.MONTH);
+            int day = calendar.get(Calendar.DAY_OF_MONTH);
+
+            new android.app.DatePickerDialog(this, (view, year1, monthOfYear, dayOfMonth) -> {
+                String date = String.format(Locale.US, "%d-%02d-%02d", year1, monthOfYear + 1, dayOfMonth);
+                editText.setText(date);
+            }, year, month, day).show();
+        });
     }
 
     private void triggerCameraScan() {
@@ -693,7 +1102,7 @@ public class MainActivity extends AppCompatActivity {
         String encodedImage = Base64.encodeToString(byteArray, Base64.NO_WRAP);
         String dataUrl = "data:image/jpeg;base64," + encodedImage;
 
-        GroqService.GroqRequest.Content textContent = new GroqService.GroqRequest.Content("text", "Analyze this receipt image and return a JSON object with a key 'items' containing an array of items. Each item should have 'name' (string) and 'price' (number). Only return the JSON object, no extra text.");
+        GroqService.GroqRequest.Content textContent = new GroqService.GroqRequest.Content("text", "Analyze this receipt image and return a JSON object with a key 'items' containing an array of items. Each item should have 'name' (string), 'price' (number), 'category' (string: one of 'Food', 'Medicine', 'Cleaners', 'Electronics', 'Clothes', 'Furniture', 'Services', 'Tools & Parts', or 'General'), and 'emoji' (string: matching emoji like 🍎, 💊, 🧼, 💻, 👕, 🛋️, 🛠️, 🔧, 📦). Only return the JSON object, no extra text.");
         GroqService.GroqRequest.Content imageContent = new GroqService.GroqRequest.Content("image_url", new GroqService.GroqRequest.ImageUrl(dataUrl));
         
         GroqService.GroqRequest.Message message = new GroqService.GroqRequest.Message("user", java.util.Arrays.asList(textContent, imageContent));
@@ -706,17 +1115,15 @@ public class MainActivity extends AppCompatActivity {
                     String text = response.body().choices.get(0).message.content;
                     runOnUiThread(() -> parseAiTextToStagedItems(text));
                 } else {
-                    String errorBody = "Unknown error";
+                    String errorMsgFinalLocal = "Unknown error";
                     try {
                         if (response.errorBody() != null) {
-                            errorBody = response.errorBody().string();
+                            errorMsgFinalLocal = response.errorBody().string();
                         }
-                        Log.e("Groq", "AI Error: " + response.code() + " - " + errorBody);
-                    } catch (IOException e) {
-                        Log.e("Groq", "AI Error: " + response.code());
-                    }
+                    } catch (IOException ignored) {}
+                    Log.e("Groq", "AI Error: " + response.code() + " - " + errorMsgFinalLocal);
 
-                    String finalErrorBody = errorBody;
+                    String finalErrorBody = errorMsgFinalLocal;
                     runOnUiThread(() -> {
                         if (finalErrorBody.contains("model_decommissioned")) {
                             Toast.makeText(MainActivity.this, "Model decommissioned. Check model ID.", Toast.LENGTH_LONG).show();
@@ -744,7 +1151,9 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject obj = array.getJSONObject(i);
                 String name = obj.getString("name");
                 double price = obj.getDouble("price");
-                mStagedItems.add(new StagedItem(name, price, "General", "📦"));
+                String category = obj.optString("category", "General");
+                String emoji = obj.optString("emoji", "📦");
+                mStagedItems.add(new StagedItem(name, price, category, emoji, "", ""));
             }
             renderStagingArea();
             switchTab(2);
@@ -759,7 +1168,6 @@ public class MainActivity extends AppCompatActivity {
         mStagedContainer.removeAllViews();
 
         for (int i = 0; i < mStagedItems.size(); i++) {
-            final int index = i;
             StagedItem item = mStagedItems.get(i);
             View row = LayoutInflater.from(this).inflate(R.layout.item_staged_receipt, mStagedContainer, false);
 
@@ -773,10 +1181,79 @@ public class MainActivity extends AppCompatActivity {
             emojiTv.setText(item.emoji);
             categoryTv.setText(item.category);
 
-            row.findViewById(R.id.btn_confirm_staged).setOnClickListener(v -> {
-                confirmStagedItem(item.name, item.price, item.category, item.emoji);
-                mStagedItems.remove(index);
+            // Edit Button Logic
+            row.findViewById(R.id.btn_edit_staged).setOnClickListener(v -> {
+                View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
+                EditText nameIn = dialogView.findViewById(R.id.input_item_name);
+                EditText priceIn = dialogView.findViewById(R.id.input_item_price);
+                android.widget.Spinner catSpinner = dialogView.findViewById(R.id.input_item_category);
+                EditText prodIn = dialogView.findViewById(R.id.input_item_production_date);
+                EditText expIn = dialogView.findViewById(R.id.input_item_expiry_date);
+
+                setupDatePicker(prodIn);
+                setupDatePicker(expIn);
+
+                String[] categories = {"Food", "Medicine", "Cleaners", "Electronics", "Clothes", "Furniture", "Services", "Tools & Parts", "General"};
+                String[] emojis = {"🍎", "💊", "🧼", "💻", "👕", "🛋️", "🛠️", "🔧", "📦"};
+                
+                android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, categories);
+                catSpinner.setAdapter(adapter);
+
+                nameIn.setText(item.name);
+                priceIn.setText(String.valueOf(item.price));
+                prodIn.setText(item.productionDate);
+                expIn.setText(item.expiryDate);
+                
+                // Set current selection
+                for (int j = 0; j < categories.length; j++) {
+                    if (categories[j].equalsIgnoreCase(item.category)) {
+                        catSpinner.setSelection(j);
+                        break;
+                    }
+                }
+
+                new AlertDialog.Builder(this)
+                        .setTitle("Edit Staged Item")
+                        .setView(dialogView)
+                        .setPositiveButton("Update", (d, w) -> {
+                            String newName = nameIn.getText().toString().trim();
+                            String newPriceStr = priceIn.getText().toString().trim();
+                            if (!newName.isEmpty() && !newPriceStr.isEmpty()) {
+                                try {
+                                    item.name = newName;
+                                    item.price = Double.parseDouble(newPriceStr);
+                                    int selectedIdx = catSpinner.getSelectedItemPosition();
+                                    item.category = categories[selectedIdx];
+                                    item.emoji = emojis[selectedIdx];
+                                    item.productionDate = prodIn.getText().toString();
+                                    item.expiryDate = expIn.getText().toString();
+                                    renderStagingArea();
+                                } catch (Exception e) {
+                                    Toast.makeText(this, "Invalid price", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            });
+
+            // Delete Button Logic
+            row.findViewById(R.id.btn_delete_staged).setOnClickListener(v -> {
+                mStagedItems.remove(item);
                 renderStagingArea();
+                if (mStagedItems.isEmpty()) {
+                    switchTab(1); // Go back to dashboard if no items left
+                }
+            });
+
+            // Confirm Button Logic
+            row.findViewById(R.id.btn_confirm_staged).setOnClickListener(v -> {
+                confirmStagedItem(item.name, item.price, item.category, item.emoji, item.productionDate, item.expiryDate);
+                mStagedItems.remove(item);
+                renderStagingArea();
+                if (mStagedItems.isEmpty()) {
+                    switchTab(2); // Switch to inventory tab to see the items
+                }
             });
 
             mStagedContainer.addView(row);
@@ -789,18 +1266,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void confirmStagedItem(String name, double price, String category, String emoji) {
+    private void confirmStagedItem(String name, double price, String category, String emoji, String prodDate, String expDate) {
         if (isFirebaseAvailable && mGroupRef != null) {
             Map<String, Object> item = new HashMap<>();
             item.put("name", name);
             item.put("price", price);
             item.put("category", category);
             item.put("emoji", emoji);
+            item.put("productionDate", prodDate);
+            item.put("expiryDate", expDate);
 
             mGroupRef.collection("items").add(item);
             mGroupRef.update("budgetSpent", FieldValue.increment(price));
             mGroupRef.update("activeAssetsValue", FieldValue.increment(price));
             mGroupRef.update("liquidCash", FieldValue.increment(-price));
+
+            // Log activity
+            Map<String, Object> activity = new HashMap<>();
+            activity.put("title", name + " Added");
+            activity.put("desc", category + " item added to stash");
+            activity.put("amount", -price);
+            activity.put("emoji", emoji);
+            activity.put("timestamp", FieldValue.serverTimestamp());
+            mGroupRef.collection("activities").add(activity);
+
             Toast.makeText(this, name + " added to Stash!", Toast.LENGTH_SHORT).show();
         } else {
             mCurrentBudgetSpent += price;
@@ -831,8 +1320,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void applyLocalMockData() {
         try {
-            if (mInputGroupBudgetCap != null) mInputGroupBudgetCap.setText(String.format("%.0f", mCurrentBudgetCap));
-            if (mSettingsCurrentCapLbl != null) mSettingsCurrentCapLbl.setText("Current limit: $" + String.format("%.0f", mCurrentBudgetCap) + "/month");
             if (mDashboardBudgetAllocated != null) mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", mCurrentBudgetCap));
             if (mDashboardBudgetSpentLbl != null) mDashboardBudgetSpentLbl.setText("$" + String.format("%,.0f", mCurrentBudgetSpent));
             if (mDashboardAssetsVal != null) mDashboardAssetsVal.setText("$" + String.format("%,.2f", mActiveAssetsValue));
@@ -854,17 +1341,28 @@ public class MainActivity extends AppCompatActivity {
                 }
                 mCurrentBudgetCap = snapshot.getDouble("budgetCap") != null ? snapshot.getDouble("budgetCap") : 10000.0;
                 mCurrentBudgetSpent = snapshot.getDouble("budgetSpent") != null ? snapshot.getDouble("budgetSpent") : 0.0;
+                mBudgetReserved = snapshot.getDouble("budgetReserved") != null ? snapshot.getDouble("budgetReserved") : 0.0;
                 mActiveAssetsValue = snapshot.getDouble("activeAssetsValue") != null ? snapshot.getDouble("activeAssetsValue") : 0.0;
                 mLiquidCash = snapshot.getDouble("liquidCash") != null ? snapshot.getDouble("liquidCash") : 0.0;
                 mWorkspaceName = snapshot.getString("workspaceName") != null ? snapshot.getString("workspaceName") : "Workspace";
                 List<String> members = (List<String>) snapshot.get("members");
                 if (members != null) { mMembersList = members; syncMembersToUI(); }
+                List<Map<String, Object>> allocations = (List<Map<String, Object>>) snapshot.get("allocations");
+                if (allocations != null) { mAllocationsList = allocations; }
                 applyLocalMockData();
             });
             mItemsListener = mGroupRef.collection("items").addSnapshotListener((snapshots, e) -> {
                 if (e != null || snapshots == null) return;
                 renderInventoryItems(snapshots);
             });
+            mGroupRef.collection("activities")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(10)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) return;
+                    mLastActivitiesSnapshot = snapshots;
+                    renderActivities(snapshots);
+                });
         } else {
             applyLocalMockData();
         }
@@ -885,15 +1383,39 @@ public class MainActivity extends AppCompatActivity {
 
     private void renderInventoryItems(com.google.firebase.firestore.QuerySnapshot snapshots) {
         if (mInventoryContainer == null) return;
+        mLastInventorySnapshot = snapshots;
         mInventoryContainer.removeAllViews();
         float density = getResources().getDisplayMetrics().density;
         LinearLayout currentRow = null;
         int count = 0;
+
+        List<QueryDocumentSnapshot> expiringSoon = new ArrayList<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+        Calendar threshold = Calendar.getInstance();
+        threshold.add(Calendar.DAY_OF_YEAR, 2); // 48 hours
+
         for (QueryDocumentSnapshot doc : snapshots) {
             String name = doc.getString("name");
             Double price = doc.getDouble("price");
             String category = doc.getString("category");
             String emoji = doc.getString("emoji");
+            String expDateStr = doc.getString("expiryDate");
+
+            // Expiry check
+            if (expDateStr != null && !expDateStr.isEmpty()) {
+                try {
+                    Date expDate = sdf.parse(expDateStr);
+                    if (expDate != null && expDate.before(threshold.getTime())) {
+                        expiringSoon.add(doc);
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // Apply filter
+            if (!mCurrentFilter.equals("All") && !mCurrentFilter.equalsIgnoreCase(category)) {
+                continue;
+            }
+
             if (emoji == null) emoji = "📦";
             if (count % 2 == 0) {
                 currentRow = new LinearLayout(this);
@@ -903,12 +1425,77 @@ public class MainActivity extends AppCompatActivity {
                 currentRow.setLayoutParams(rowParams);
                 mInventoryContainer.addView(currentRow);
             }
-            currentRow.addView(createInventoryCard(doc.getId(), name, price, category, emoji));
+            currentRow.addView(createInventoryCard(doc.getId(), name, price, category, emoji, expDateStr));
             count++;
+        }
+
+        updateExpiryWidget(expiringSoon);
+    }
+
+    private void updateExpiryWidget(List<QueryDocumentSnapshot> expiringItems) {
+        if (mExpiryContainer == null) return;
+        mExpiryContainer.removeAllViews();
+
+        if (expiringItems.isEmpty()) {
+            mExpiryContainer.setVisibility(View.GONE);
+            return;
+        }
+
+        mExpiryContainer.setVisibility(View.VISIBLE);
+        float density = getResources().getDisplayMetrics().density;
+
+        for (int i = 0; i < expiringItems.size(); i++) {
+            QueryDocumentSnapshot item = expiringItems.get(i);
+            String name = item.getString("name");
+            String expDate = item.getString("expiryDate");
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            if (i > 0) row.setPadding(0, (int)(12 * density), 0, 0);
+
+            TextView dot = new TextView(this);
+            dot.setText("•");
+            dot.setTextColor(getResources().getColor(R.color.urgency_red));
+            dot.setTextSize(24);
+            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dotParams.setMarginEnd((int)(10 * density));
+            dotParams.topMargin = (int)(-4 * density);
+            dot.setLayoutParams(dotParams);
+            row.addView(dot);
+
+            LinearLayout textLayout = new LinearLayout(this);
+            textLayout.setOrientation(LinearLayout.VERTICAL);
+            
+            TextView title = new TextView(this);
+            title.setText("Expiry Alert: " + name);
+            title.setTextColor(getResources().getColor(R.color.primary));
+            title.setTypeface(null, Typeface.BOLD);
+            title.setTextSize(14);
+            textLayout.addView(title);
+
+            TextView desc = new TextView(this);
+            desc.setText("Urgent: Item expires on " + expDate);
+            desc.setTextColor(getResources().getColor(R.color.urgency_red));
+            desc.setTextSize(12);
+            textLayout.addView(desc);
+
+            row.addView(textLayout);
+            mExpiryContainer.addView(row);
+            
+            if (i < expiringItems.size() - 1) {
+                View divider = new View(this);
+                divider.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1));
+                divider.setBackgroundColor(getResources().getColor(R.color.border_gray));
+                divider.setAlpha(0.5f);
+                LinearLayout.LayoutParams divParams = (LinearLayout.LayoutParams) divider.getLayoutParams();
+                divParams.topMargin = (int)(12 * density);
+                mExpiryContainer.addView(divider);
+            }
         }
     }
 
-    private View createInventoryCard(String id, String name, Double price, String category, String emoji) {
+    private View createInventoryCard(String id, String name, Double price, String category, String emoji, String expDate) {
         float density = getResources().getDisplayMetrics().density;
         LinearLayout card = new LinearLayout(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -937,12 +1524,29 @@ public class MainActivity extends AppCompatActivity {
         priceTv.setTextSize(11);
         card.addView(priceTv);
 
+        if (expDate != null && !expDate.isEmpty()) {
+            TextView expTv = new TextView(this);
+            expTv.setText("Exp: " + expDate);
+            expTv.setTextColor(getResources().getColor(R.color.urgency_red));
+            expTv.setTextSize(10);
+            card.addView(expTv);
+        }
+
         card.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle(name)
                 .setMessage("Remove this item from stash?")
                 .setPositiveButton("Remove / Consume", (d, w) -> {
                     mGroupRef.collection("items").document(id).delete();
                     mGroupRef.update("activeAssetsValue", FieldValue.increment(-(price != null ? price : 0.0)));
+
+                    // Log activity
+                    Map<String, Object> activity = new HashMap<>();
+                    activity.put("title", name + " Removed");
+                    activity.put("desc", "Item removed or consumed");
+                    activity.put("amount", price);
+                    activity.put("emoji", "✅");
+                    activity.put("timestamp", FieldValue.serverTimestamp());
+                    mGroupRef.collection("activities").add(activity);
                 })
                 .setNegativeButton("Cancel", null)
                 .show());
@@ -981,27 +1585,57 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateRatioBar() {
-        if (mDashboardProgressFill == null || mDashboardUtilizationLbl == null) return;
-        double ratio = (mCurrentBudgetSpent / mCurrentBudgetCap) * 100.0;
-        if (ratio > 100.0) ratio = 100.0;
-        mDashboardUtilizationLbl.setText(String.format("%.1f", ratio) + "% Utilized");
-        mDashboardProgressFill.post(() -> {
+        if (mDashboardProgressContainer == null || mDashboardUtilizationLbl == null) return;
+        
+        double spentRatio = (mCurrentBudgetSpent / mCurrentBudgetCap) * 100.0;
+        mDashboardUtilizationLbl.setText(String.format("%.1f%% Utilized", Math.min(100.0, spentRatio)));
+
+        double reservedRatio = (mBudgetReserved / mCurrentBudgetCap) * 100.0;
+        if (mDashboardAllocatedLbl != null) {
+            mDashboardAllocatedLbl.setText(String.format("%.1f%% Allocated", Math.min(100.0, reservedRatio)));
+        }
+
+        mDashboardProgressContainer.post(() -> {
             try {
-                View parent = (View) mDashboardProgressFill.getParent();
-                if (parent != null) {
-                    int parentWidth = parent.getWidth() > 0 ? parent.getWidth() : parent.getMeasuredWidth();
-                    double percent = (mCurrentBudgetSpent / mCurrentBudgetCap);
-                    if (percent > 1.0) percent = 1.0; if (percent < 0.0) percent = 0.0;
-                    android.view.ViewGroup.LayoutParams params = mDashboardProgressFill.getLayoutParams();
-                    if (params != null) { params.width = (int) (parentWidth * percent); mDashboardProgressFill.setLayoutParams(params); }
-                    if (percent >= 0.9) { mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.urgency_red)); mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.urgency_red)); }
-                    else { mDashboardProgressFill.setBackgroundColor(getResources().getColor(R.color.accent_blue)); mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.text_muted)); }
+                mDashboardProgressContainer.removeAllViews();
+                
+                // 1. Add Allocations from the left
+                for (int i = 0; i < mAllocationsList.size(); i++) {
+                    Map<String, Object> alloc = mAllocationsList.get(i);
+                    Double amount = 0.0;
+                    if (alloc.get("amount") instanceof Double) amount = (Double) alloc.get("amount");
+                    else if (alloc.get("amount") instanceof Long) amount = ((Long) alloc.get("amount")).doubleValue();
+                    
+                    if (amount <= 0) continue;
+                    
+                    float weight = (float) (amount / mCurrentBudgetCap);
+                    View segment = new View(this);
+                    segment.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight));
+                    segment.setBackgroundColor(ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]);
+                    mDashboardProgressContainer.addView(segment);
                 }
-            } catch (Exception e) {}
+                
+                // 2. Add Spent part
+                if (mCurrentBudgetSpent > 0) {
+                    float spentWeight = (float) (mCurrentBudgetSpent / mCurrentBudgetCap);
+                    View spentSegment = new View(this);
+                    spentSegment.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, spentWeight));
+                    
+                    if (spentRatio >= 90.0) {
+                        spentSegment.setBackgroundColor(getResources().getColor(R.color.urgency_red));
+                        mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.urgency_red));
+                    } else {
+                        spentSegment.setBackgroundColor(getResources().getColor(R.color.accent_blue));
+                        mDashboardUtilizationLbl.setTextColor(getResources().getColor(R.color.text_muted));
+                    }
+                    mDashboardProgressContainer.addView(spentSegment);
+                }
+            } catch (Exception e) {
+                Log.e("UI", "Error updating ratio bar", e);
+            }
         });
     }
 
-    private TextView mDashboardBudgetAllocated;
     @Override
-    protected void onResume() { super.onResume(); try { mDashboardBudgetAllocated = findViewById(R.id.dashboard_budget_allocated); applyLocalMockData(); } catch (Throwable t) {} }
+    protected void onResume() { super.onResume(); try { applyLocalMockData(); } catch (Throwable t) {} }
 }

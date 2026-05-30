@@ -82,14 +82,6 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <!--<TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="October Cycle"
-                            android:textColor="@color/text_muted"
-                            android:textSize="14sp"
-                            android:textStyle="italic" />-->
-
                         <TextView
                             android:id="@+id/greeting_text"
                             android:layout_width="wrap_content"
@@ -99,7 +91,6 @@
                             android:textSize="26sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-
                 </RelativeLayout>
 
                 <!-- Hero Budget Card -->
@@ -110,7 +101,6 @@
                     android:orientation="vertical"
                     android:padding="24dp"
                     android:elevation="4dp"
-                    android:translationZ="2dp"
                     android:layout_marginBottom="16dp">
 
                     <RelativeLayout
@@ -128,14 +118,19 @@
                             android:letterSpacing="0.05" />
 
                         <TextView
-                            android:id="@+id/dashboard_detail_tag"
+                            android:id="@+id/btn_edit_budget"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
-                            android:text="On Track"
+                            android:text="Edit Budget"
+                            android:background="@drawable/tag_green_tint"
+                            android:paddingHorizontal="10dp"
+                            android:paddingVertical="4dp"
                             android:textColor="@color/growth_green"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:clickable="true"
+                            android:focusable="true"/>
                     </RelativeLayout>
 
                     <!-- Hero numbers with aligned decimal -->
@@ -189,6 +184,15 @@
                             android:text="42.5% Utilized"
                             android:textColor="@color/text_muted"
                             android:textSize="12dp" />
+
+                        <TextView
+                            android:id="@+id/dashboard_allocated_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:text="0.0% Allocated"
+                            android:textColor="@color/secondary"
+                            android:textSize="12dp" />
                     </RelativeLayout>
 
                     <FrameLayout
@@ -197,12 +201,14 @@
                         android:background="@drawable/input_field_background"
                         android:layout_marginTop="4dp">
 
-                        <!-- Two-tone indicator horizontal bar (Growth Green for valid progress) -->
-                        <View
-                            android:id="@+id/dashboard_progress_fill"
-                            android:layout_width="140dp"
+                        <LinearLayout
+                            android:id="@+id/dashboard_progress_container"
+                            android:layout_width="match_parent"
                             android:layout_height="match_parent"
-                            android:background="@color/accent_blue" />
+                            android:orientation="horizontal"
+                            android:weightSum="1.0">
+                            <!-- Dynamic segments: [Allocations...] [Spent] -->
+                        </LinearLayout>
                     </FrameLayout>
 
                     <!-- Line divider -->
@@ -212,23 +218,26 @@
                         android:background="@color/border_gray"
                         android:layout_marginVertical="20dp" />
 
-                    <!-- Side-by-side metric distributions custom layout -->
+                    <!-- Metrics -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal">
 
-                        <!-- Distribution A -->
                         <LinearLayout
+                            android:id="@+id/btn_tile_allocated_funds"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:orientation="vertical"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:background="?attr/selectableItemBackground">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Active Assets"
+                                android:text="Allocated Funds"
                                 android:textColor="@color/text_muted"
                                 android:textSize="12sp"
                                 android:textStyle="bold" />
@@ -237,21 +246,19 @@
                                 android:id="@+id/dashboard_assets_val"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="$2,800.00"
+                                android:text="$0.00"
                                 android:textColor="@color/primary"
                                 android:textSize="18dp"
                                 android:textStyle="bold"
                                 android:layout_marginTop="4dp" />
                         </LinearLayout>
 
-                        <!-- Divider line -->
                         <View
                             android:layout_width="1dp"
                             android:layout_height="match_parent"
                             android:background="@color/border_gray"
                             android:layout_marginHorizontal="12dp" />
 
-                        <!-- Distribution B -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -277,7 +284,6 @@
                                 android:layout_marginTop="4dp" />
                         </LinearLayout>
                     </LinearLayout>
-
                 </LinearLayout>
 
                 <!-- Dual Action Grid -->
@@ -287,9 +293,9 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="24dp">
 
-                    <!-- Black Solid "Log Asset" selection tile -->
+                    <!-- Black Solid "Allocate Budget" selection tile -->
                     <LinearLayout
-                        android:id="@+id/btn_tile_log"
+                        android:id="@+id/btn_tile_allocate"
                         android:layout_width="0dp"
                         android:layout_height="120dp"
                         android:layout_weight="1"
@@ -297,20 +303,21 @@
                         android:layout_marginEnd="6dp"
                         android:orientation="vertical"
                         android:gravity="bottom"
-                        android:padding="16dp">
+                        android:padding="16dp"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="+"
-                            android:textColor="@color/white"
+                            android:text="💰"
                             android:textSize="24sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Log Asset"
+                            android:text="Allocate Budget"
                             android:textColor="@color/white"
                             android:textSize="16sp"
                             android:textStyle="bold" />
@@ -318,12 +325,11 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Scan or write item"
+                            android:text="Reserve for goals"
                             android:textColor="#C0C0C0"
                             android:textSize="11sp" />
                     </LinearLayout>
 
-                    <!-- White Solid "View Analysis" tile -->
                     <LinearLayout
                         android:id="@+id/btn_tile_analysis"
                         android:layout_width="0dp"
@@ -334,13 +340,14 @@
                         android:orientation="vertical"
                         android:gravity="bottom"
                         android:padding="16dp"
-                        android:elevation="2dp">
+                        android:elevation="2dp"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="📊"
-                            android:textColor="@color/accent_blue"
                             android:textSize="24sp" />
 
                         <TextView
@@ -371,7 +378,6 @@
                     android:letterSpacing="0.08"
                     android:layout_marginBottom="12dp" />
 
-                <!-- Multi-row vertical activity list container -->
                 <LinearLayout
                     android:id="@+id/container_recent_activities"
                     android:layout_width="match_parent"
@@ -380,190 +386,10 @@
                     android:orientation="vertical"
                     android:paddingVertical="8dp"
                     android:elevation="2dp">
-
-                    <!-- Row 1 -->
-                    <RelativeLayout
-                        android:id="@+id/row_activity_1"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:background="?attr/selectableItemBackground">
-
-                        <TextView
-                            android:id="@+id/act_emoji_1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="💻"
-                            android:textSize="22dp"
-                            android:layout_centerVertical="true" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_toEndOf="@id/act_emoji_1"
-                            android:layout_toStartOf="@+id/act_amount_1"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="MacBook Pro M3 Added"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                android:ellipsize="end"
-                                android:maxLines="1" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Office Equipment • 2 hours ago"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/act_amount_1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:text="-$2,400.00"
-                            android:textColor="@color/urgency_red"
-                            android:textSize="14dp"
-                            android:textStyle="bold" />
-                    </RelativeLayout>
-
-                    <!-- Row line divider -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/black"
-                        android:alpha="0.05" />
-
-                    <!-- Row 2 -->
-                    <RelativeLayout
-                        android:id="@+id/row_activity_2"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:background="?attr/selectableItemBackground">
-
-                        <TextView
-                            android:id="@+id/act_emoji_2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="💰"
-                            android:textSize="22dp"
-                            android:layout_centerVertical="true" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_toEndOf="@id/act_emoji_2"
-                            android:layout_toStartOf="@+id/act_amount_2"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Monthly Allocation Reserved"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                android:ellipsize="end"
-                                android:maxLines="1" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Main Account Budget • 1 day ago"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/act_amount_2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:text="+$10,000.00"
-                            android:textColor="@color/growth_green"
-                            android:textSize="14dp"
-                            android:textStyle="bold" />
-                    </RelativeLayout>
-
-                    <!-- Divider -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/black"
-                        android:alpha="0.05" />
-
-                    <!-- Row 3 -->
-                    <RelativeLayout
-                        android:id="@+id/row_activity_3"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:background="?attr/selectableItemBackground">
-
-                        <TextView
-                            android:id="@+id/act_emoji_3"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="👥"
-                            android:textSize="22dp"
-                            android:layout_centerVertical="true" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_toEndOf="@id/act_emoji_3"
-                            android:layout_toStartOf="@+id/act_status_3"
-                            android:layout_marginStart="14dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Sarah joined Team"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                android:ellipsize="end"
-                                android:maxLines="1" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Household Workspace • 2 days ago"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/act_status_3"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:text="Active"
-                            android:textColor="@color/accent_blue"
-                            android:textSize="12dp"
-                            android:textStyle="bold" />
-                    </RelativeLayout>
-
+                    <!-- Dynamic rows will be added here -->
                 </LinearLayout>
 
             </LinearLayout>
-
 
             <!-- ================= VIEW 2: INVENTORY ================= -->
             <LinearLayout
@@ -574,7 +400,6 @@
                 android:padding="20dp"
                 android:visibility="gone">
 
-                <!-- Title header -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -587,12 +412,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Verify extracted receipts (Google ML Kit)"
+                    android:text="Verify extracted receipts (Groq AI)"
                     android:textColor="@color/text_muted"
                     android:textSize="13sp"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Verification staging rows contained in card -->
                 <LinearLayout
                     android:id="@+id/container_staged_items"
                     android:layout_width="match_parent"
@@ -602,52 +426,70 @@
                     android:paddingVertical="8dp"
                     android:elevation="2dp"
                     android:layout_marginBottom="16dp">
-
-                    <!-- Dynamic rows will be added here -->
-
+                    <!-- Dynamic rows -->
                 </LinearLayout>
 
-                <!-- Warnings alert card block -->
+                <!-- Expiry Notification Widget (Functional) -->
                 <LinearLayout
+                    android:id="@+id/expiry_warning_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/card_danger_background"
-                    android:orientation="horizontal"
+                    android:background="@drawable/card_background"
+                    android:orientation="vertical"
                     android:padding="16dp"
                     android:elevation="2dp"
-                    android:layout_marginBottom="24dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="⚠️"
-                        android:textSize="22sp"
-                        android:layout_marginEnd="12dp" />
+                    android:layout_marginBottom="24dp"
+                    android:visibility="gone">
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Fresh Steak ($14.50)"
+                            android:text="•"
                             android:textColor="@color/urgency_red"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textSize="28dp"
+                            android:layout_gravity="top"
+                            android:layout_marginTop="-6dp"
+                            android:layout_marginEnd="10dp" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Expires in 24 hours! Cook or freeze to prevent waste."
-                            android:textColor="@color/primary"
-                            android:textSize="12dp" />
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/expiry_warning_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="System Notification"
+                                android:textColor="@color/primary"
+                                android:textStyle="bold"
+                                android:textSize="14sp" />
+
+                            <TextView
+                                android:id="@+id/expiry_warning_desc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Urgent action required"
+                                android:textColor="@color/urgency_red"
+                                android:textSize="12dp" />
+
+                            <TextView
+                                android:id="@+id/expiry_warning_time"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Just now"
+                                android:textColor="@color/text_muted"
+                                android:textSize="11dp"
+                                android:layout_marginTop="2dp" />
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- Search and Filters Section -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -657,7 +499,6 @@
                     android:textStyle="bold"
                     android:layout_marginBottom="12dp" />
 
-                <!-- Embedded search bar -->
                 <EditText
                     android:id="@+id/search_bar"
                     android:layout_width="match_parent"
@@ -674,7 +515,6 @@
                     android:importantForAutofill="no"
                     android:inputType="text" />
 
-                <!-- Horizontal filters layout -->
                 <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -732,24 +572,78 @@
                             android:gravity="center"
                             android:textColor="@color/primary"
                             android:paddingHorizontal="16dp"
-                            android:textSize="12dp" />
+                            android:textSize="12dp"
+                            android:layout_marginEnd="8dp" />
 
+                        <TextView
+                            android:id="@+id/filter_electronics"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/input_field_background"
+                            android:text="Electronics"
+                            android:gravity="center"
+                            android:textColor="@color/primary"
+                            android:paddingHorizontal="16dp"
+                            android:textSize="12dp"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/filter_clothes"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/input_field_background"
+                            android:text="Clothes"
+                            android:gravity="center"
+                            android:textColor="@color/primary"
+                            android:paddingHorizontal="16dp"
+                            android:textSize="12dp"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/filter_furniture"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/input_field_background"
+                            android:text="Furniture"
+                            android:gravity="center"
+                            android:textColor="@color/primary"
+                            android:paddingHorizontal="16dp"
+                            android:textSize="12dp"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/filter_services"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/input_field_background"
+                            android:text="Services"
+                            android:gravity="center"
+                            android:textColor="@color/primary"
+                            android:paddingHorizontal="16dp"
+                            android:textSize="12dp"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/filter_tools"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/input_field_background"
+                            android:text="Tools &amp; Parts"
+                            android:gravity="center"
+                            android:textColor="@color/primary"
+                            android:paddingHorizontal="16dp"
+                            android:textSize="12dp" />
                     </LinearLayout>
                 </HorizontalScrollView>
 
-                <!-- Grid system of storage cards (2 columns, simple simulated LinearLayout rows of grids) -->
                 <LinearLayout
                     android:id="@+id/inventory_grid_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
-
-                    <!-- Content will be added dynamically from Firestore -->
-
+                    <!-- Dynamic inventory items -->
                 </LinearLayout>
-
             </LinearLayout>
-
 
             <!-- ================= VIEW 3: COLLABORATIVE GROUP ================= -->
             <LinearLayout
@@ -760,7 +654,6 @@
                 android:padding="20dp"
                 android:visibility="gone">
 
-                <!-- Household workspace branding container -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -799,7 +692,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="52dp">
 
-                        <!-- Copy action container wrapping unique invite code -->
                         <LinearLayout
                             android:id="@+id/wrap_copy_invite"
                             android:layout_width="match_parent"
@@ -808,7 +700,9 @@
                             android:background="@drawable/input_field_background"
                             android:paddingHorizontal="14dp"
                             android:gravity="center_vertical"
-                            android:layout_marginEnd="12dp">
+                            android:layout_marginEnd="12dp"
+                            android:clickable="true"
+                            android:focusable="true">
 
                             <TextView
                                 android:id="@+id/group_invite_code"
@@ -829,7 +723,6 @@
                                 android:layout_marginStart="14dp" />
                         </LinearLayout>
 
-                        <!-- Solid Black Invite Button -->
                         <Button
                             android:id="@+id/btn_invite_action"
                             android:layout_width="wrap_content"
@@ -844,7 +737,6 @@
                     </RelativeLayout>
                 </LinearLayout>
 
-                <!-- Members block -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -854,7 +746,6 @@
                     android:textStyle="bold"
                     android:layout_marginBottom="12dp" />
 
-                <!-- Member tracking array using structural circular profile pictures -->
                 <LinearLayout
                     android:id="@+id/container_members"
                     android:layout_width="match_parent"
@@ -862,7 +753,6 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="24dp">
 
-                    <!-- Alex (Current User) -->
                     <LinearLayout
                         android:id="@+id/member_alex"
                         android:layout_width="72dp"
@@ -891,7 +781,6 @@
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
 
-                            <!-- Active status dot -->
                             <View
                                 android:layout_width="12dp"
                                 android:layout_height="12dp"
@@ -909,15 +798,14 @@
                             android:textSize="11dp" />
                     </LinearLayout>
 
-                    <!-- Dynamically loaded members go here -->
-
-                    <!-- Add icon trigger placeholder -->
                     <LinearLayout
                         android:id="@+id/btn_add_member_mock"
                         android:layout_width="72dp"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:gravity="center">
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true">
 
                         <FrameLayout
                             android:layout_width="54dp"
@@ -942,172 +830,8 @@
                             android:textColor="@color/primary"
                             android:textSize="11dp" />
                     </LinearLayout>
-
                 </LinearLayout>
-
-                <!-- Activity Feed section (reusable vertical feed list) -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Activity Feed"
-                    android:textColor="@color/primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
-
-                <!-- Vertical timelines -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="@drawable/card_background"
-                    android:elevation="2dp"
-                    android:padding="16dp">
-
-                    <!-- Event A -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="16dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="•"
-                            android:textColor="@color/accent_blue"
-                            android:textSize="28dp"
-                            android:layout_gravity="top"
-                            android:layout_marginTop="-6dp"
-                            android:layout_marginEnd="10dp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Alex scanned Costco receipt"
-                                android:textColor="@color/primary"
-                                android:textStyle="bold"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="+$84.20 value added to active inventory"
-                                android:textColor="@color/accent_blue"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="2 hours ago"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp"
-                                android:layout_marginTop="2dp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Event B -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="16dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="•"
-                            android:textColor="@color/growth_green"
-                            android:textSize="28dp"
-                            android:layout_gravity="top"
-                            android:layout_marginTop="-6dp"
-                            android:layout_marginEnd="10dp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Sam consumed milk"
-                                android:textColor="@color/primary"
-                                android:textStyle="bold"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Preserved Asset Delta (Balanced)"
-                                android:textColor="@color/growth_green"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="5 hours ago"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp"
-                                android:layout_marginTop="2dp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Event C -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="•"
-                            android:textColor="@color/urgency_red"
-                            android:textSize="28dp"
-                            android:layout_gravity="top"
-                            android:layout_marginTop="-6dp"
-                            android:layout_marginEnd="10dp" />
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="System Notification: Fresh Steak Alert!"
-                                android:textColor="@color/primary"
-                                android:textStyle="bold"
-                                android:textSize="14sp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Urgent action required: Expires in 24 hours"
-                                android:textColor="@color/urgency_red"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Just now"
-                                android:textColor="@color/text_muted"
-                                android:textSize="11dp"
-                                android:layout_marginTop="2dp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                </LinearLayout>
-
             </LinearLayout>
-
 
             <!-- ================= VIEW 4: SETTINGS & PREFERENCES ================= -->
             <LinearLayout
@@ -1118,7 +842,6 @@
                 android:padding="20dp"
                 android:visibility="gone">
 
-                <!-- Account profile identity node card -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1164,7 +887,6 @@
                         android:textSize="13sp"
                         android:layout_marginBottom="16dp" />
 
-                    <!-- Logout button with exit indicator graphics -->
                     <Button
                         android:id="@+id/btn_logout"
                         android:layout_width="match_parent"
@@ -1177,7 +899,6 @@
                         android:textSize="14sp"/>
                 </LinearLayout>
 
-                <!-- Editable Workspace configurations card -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1225,7 +946,6 @@
                         android:layout_marginBottom="14dp"
                         android:importantForAutofill="no" />
 
-                    <!-- Asynchronous save handler button -->
                     <Button
                         android:id="@+id/btn_join_group"
                         android:layout_width="match_parent"
@@ -1239,7 +959,6 @@
                         android:textAllCaps="false" />
                 </LinearLayout>
 
-                <!-- Editable Workspace configurations card -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1252,7 +971,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Group Budget Limits"
+                        android:text="Budget Reset"
                         android:textColor="@color/primary"
                         android:textSize="16sp"
                         android:textStyle="bold"
@@ -1261,58 +980,23 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Adjust the maximum monthly expenditure allowed for the group."
+                        android:text="Reset the total amount spent this month to zero."
                         android:textColor="@color/text_muted"
                         android:textSize="12dp"
                         android:layout_marginBottom="14dp" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Monthly Budget Cap ($)"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:layout_marginBottom="6dp" />
-
-                    <EditText
-                        android:id="@+id/input_group_budget_cap"
+                    <Button
+                        android:id="@+id/btn_reset_spent"
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:background="@drawable/input_field_background"
-                        android:hint="500"
-                        android:inputType="number"
-                        android:paddingHorizontal="14dp"
-                        android:textColor="@color/primary"
-                        android:textSize="14sp"
-                        android:layout_marginBottom="14dp"
-                        android:importantForAutofill="no" />
-
-                    <!-- Asynchronous save handler button -->
-                    <Button
-                        android:id="@+id/btn_save_settings"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:background="@drawable/btn_dark_rounded"
-                        app:backgroundTint="@color/primary"
-                        android:text="Save Budget Limits"
-                        android:textColor="@color/white"
-                        android:textSize="14sp"
+                        android:text="Reset Spent Money"
+                        android:textAllCaps="false"
+                        android:textColor="@color/urgency_red"
                         android:textStyle="bold"
-                        android:textAllCaps="false" />
-
-                    <TextView
-                        android:id="@+id/settings_current_cap_lbl"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Current limit: $500/month"
-                        android:textColor="@color/text_muted"
-                        android:textSize="11dp"
-                        android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="8dp" />
+                        android:textSize="14sp"/>
                 </LinearLayout>
 
-                <!-- Preferences / switch options -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1330,7 +1014,7 @@
                         android:textStyle="bold"
                         android:layout_marginBottom="16dp" />
 
-                    <!-- Preference A: 48-Hour warnings -->
+                    <!-- Dark Mode Preference -->
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -1339,14 +1023,14 @@
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_toStartOf="@+id/switch_preferences_1"
+                            android:layout_toStartOf="@+id/switch_dark_mode"
                             android:layout_alignParentStart="true"
                             android:orientation="vertical">
 
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="48-Hour Expiration Warnings"
+                                android:text="Dark Mode"
                                 android:textColor="@color/primary"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
@@ -1354,121 +1038,62 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Alert group when items near expiration."
+                                android:text="Toggle between light and dark UI"
                                 android:textColor="@color/text_muted"
                                 android:textSize="12dp" />
                         </LinearLayout>
 
-                        <!-- Switch turns Financial blue when active -->
                         <androidx.appcompat.widget.SwitchCompat
-                            android:id="@+id/switch_preferences_1"
+                            android:id="@+id/switch_dark_mode"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_alignParentEnd="true"
                             android:layout_centerVertical="true"
-                            android:checked="true"
                             app:thumbTint="@color/white"
                             app:trackTint="@color/accent_blue" />
                     </RelativeLayout>
 
-                    <!-- Divider -->
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="@color/border_gray"
                         android:layout_marginVertical="10dp" />
 
-                    <!-- Preference B: digests -->
-                    <RelativeLayout
+                    <!-- Language Preference -->
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="16dp">
+                        android:orientation="vertical">
 
-                        <LinearLayout
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_toStartOf="@+id/switch_preferences_2"
-                            android:layout_alignParentStart="true"
-                            android:orientation="vertical">
+                            android:text="App Language"
+                            android:textColor="@color/primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="4dp" />
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Group Activity Digests"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Daily summary of items added or removed"
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp" />
-                        </LinearLayout>
-
-                        <androidx.appcompat.widget.SwitchCompat
-                            android:id="@+id/switch_preferences_2"
+                        <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:checked="true"
-                            app:thumbTint="@color/white"
-                            app:trackTint="@color/accent_blue" />
-                    </RelativeLayout>
+                            android:text="Choose your preferred language"
+                            android:textColor="@color/text_muted"
+                            android:textSize="12dp"
+                            android:layout_marginBottom="12dp" />
 
-                    <!-- Divider -->
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/border_gray"
-                        android:layout_marginVertical="10dp" />
-
-                    <!-- Preference C: Reports -->
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_toStartOf="@+id/switch_preferences_3"
-                            android:layout_alignParentStart="true"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Weekly Waste Reports"
-                                android:textColor="@color/primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Insights on discarded or unused items."
-                                android:textColor="@color/text_muted"
-                                android:textSize="12dp" />
-                        </LinearLayout>
-
-                        <androidx.appcompat.widget.SwitchCompat
-                            android:id="@+id/switch_preferences_3"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:checked="false" />
-                    </RelativeLayout>
-
+                        <Spinner
+                            android:id="@+id/spinner_language"
+                            android:layout_width="match_parent"
+                            android:layout_height="48dp"
+                            android:background="@drawable/input_field_background"
+                            android:paddingHorizontal="14dp" />
+                    </LinearLayout>
                 </LinearLayout>
-
             </LinearLayout>
 
         </FrameLayout>
     </ScrollView>
-
 
     <!-- Premium Bottom Navigation Layout Bar -->
     <LinearLayout
@@ -1478,18 +1103,17 @@
         android:background="@color/white"
         android:orientation="horizontal"
         android:elevation="12dp"
-        android:clipChildren="false"
-        android:clipToPadding="false"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Tab 1: Dashboard -->
         <LinearLayout
             android:id="@+id/tab_dashboard"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/icon_tab_dashboard"
@@ -1508,38 +1132,40 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <!-- Tab 2: Inventory -->
         <LinearLayout
             android:id="@+id/tab_inventory"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/icon_tab_inventory"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/StashLogo"
+                android:text="📦"
                 android:textSize="20sp"/>
 
             <TextView
                 android:id="@+id/lbl_tab_inventory"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/StashUnderLogo"
+                android:text="Stash"
                 android:textColor="@color/primary"
                 android:textSize="10sp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <!-- Tab 3: Scan Floating layout item in Center -->
         <FrameLayout
             android:id="@+id/tab_scan"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:clickable="true"
+            android:focusable="true">
 
             <RelativeLayout
                 android:layout_width="54dp"
@@ -1555,22 +1181,19 @@
                     android:layout_centerInParent="true"
                     android:text="+"
                     android:textColor="@color/white"
-                    android:textSize="24sp"
-                    android:textStyle="normal" />
+                    android:textSize="24sp" />
             </RelativeLayout>
-
-
-
         </FrameLayout>
 
-        <!-- Tab 4: Cooperative Group -->
         <LinearLayout
             android:id="@+id/tab_group"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/icon_tab_group"
@@ -1589,14 +1212,15 @@
                 android:layout_marginTop="2dp" />
         </LinearLayout>
 
-        <!-- Tab 5: Settings -->
         <LinearLayout
             android:id="@+id/tab_settings"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true">
 
             <TextView
                 android:id="@+id/icon_tab_settings"
@@ -1614,7 +1238,5 @@
                 android:textSize="10dp"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
-
     </LinearLayout>
-
 </androidx.constraintlayout.widget.ConstraintLayout>
