@@ -6,9 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
@@ -18,7 +16,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -65,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
     // View panes (TABS)
     private LinearLayout mDashboardView;
     private LinearLayout mInventoryView;
-    private LinearLayout mGroupView;
+    private FrameLayout mGroupView;
     private LinearLayout mSettingsView;
 
     // Bottom Navigation Elements
@@ -75,10 +72,10 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout mTabGroup;
     private LinearLayout mTabSettings;
 
-    private TextView mIconDashboard, mLblDashboard;
-    private TextView mIconInventory, mLblInventory;
-    private TextView mIconGroup, mLblGroup;
-    private TextView mIconSettings, mLblSettings;
+    private TextView mLblDashboard;
+    private TextView mLblInventory;
+    private TextView mLblGroup;
+    private TextView mLblSettings;
 
     // Interactive Dashboard Widgets
     private TextView mDashboardBudgetSpentLbl;
@@ -92,22 +89,12 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout mBtnTileAllocate, mBtnTileAnalysis, mBtnTileAllocatedFunds;
 
     // Group Widget Elements
-    private LinearLayout mWrapCopyInvite;
-    private TextView mGroupInviteCode;
-    private Button mBtnInviteAction;
-    private LinearLayout mBtnAddMemberMock;
-    private LinearLayout mMembersContainer;
     private LinearLayout mRecentActivityContainer;
 
     // Settings elements
     private Button mBtnLogout;
     private Button mBtnResetSpent;
-    private EditText mInputActiveGroupCode;
-    private Button mBtnJoinGroup;
-    private SwitchCompat mSwitchDarkMode;
-    private android.widget.Spinner mSpinnerLanguage;
 
-    // Recent Activity Rows
     // Inventory Elements for Filtering
     private EditText mSearchBar;
     private TextView mFilterAll, mFilterFood, mFilterMedicine, mFilterCleaners, mFilterElectronics, mFilterClothes, mFilterFurniture, mFilterServices, mFilterTools;
@@ -119,6 +106,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Staging Data
     private List<StagedItem> mStagedItems = new ArrayList<>();
+    private List<Map<String, Object>> mLocalItems = new ArrayList<>();
     
     // AI Recognition (Groq)
     private GroqService mGroqService;
@@ -155,18 +143,22 @@ public class MainActivity extends AppCompatActivity {
     private com.google.firebase.firestore.ListenerRegistration mItemsListener;
 
     // Local state simulation fallbacks
-    private double mCurrentBudgetSpent = 4250.0;
-    private double mCurrentBudgetCap = 10000.0;
+    private double mCurrentBudgetSpent = 0.0;
+    private double mCurrentBudgetCap = 0.0;
     private double mBudgetReserved = 0.0;
     private String mCurrentFilter = "All";
     private com.google.firebase.firestore.QuerySnapshot mLastInventorySnapshot;
     private com.google.firebase.firestore.QuerySnapshot mLastActivitiesSnapshot;
-    private double mActiveAssetsValue = 2800.0;
-    private double mLiquidCash = 5750.0;
+    private double mActiveAssetsValue = 0.0;
+    private double mLiquidCash = 0.0;
     private String mInviteCode = "STSH9X";
     private String mWorkspaceName = "The BroHouse Crew";
+    
+    // Joint Workspace System State
+    private String mUserRole = "casual"; // admin or casual
+    private String mCurrentGroupId = null;
+    private com.google.firebase.firestore.ListenerRegistration mUserListener;
 
-    private List<String> mMembersList = new ArrayList<>();
     private List<Map<String, Object>> mAllocationsList = new ArrayList<>();
     private static final int[] ALLOCATION_COLORS = {
             0xFF003EC6, // secondary / deep blue
@@ -202,7 +194,11 @@ public class MainActivity extends AppCompatActivity {
         setupInventoryLogic();
 
         // Query cloud states or apply local mock levels
-        fetchGroupData();
+        observeUserState();
+        if (mCurrentGroupId == null) {
+            applyLocalMockData();
+            renderInventoryItems(null);
+        }
         updateProfileUI();
     }
 
@@ -220,13 +216,9 @@ public class MainActivity extends AppCompatActivity {
         mTabGroup = findViewById(R.id.tab_group);
         mTabSettings = findViewById(R.id.tab_settings);
 
-        mIconDashboard = findViewById(R.id.icon_tab_dashboard);
         mLblDashboard = findViewById(R.id.lbl_tab_dashboard);
-        mIconInventory = findViewById(R.id.icon_tab_inventory);
         mLblInventory = findViewById(R.id.lbl_tab_inventory);
-        mIconGroup = findViewById(R.id.icon_tab_group);
         mLblGroup = findViewById(R.id.lbl_tab_group);
-        mIconSettings = findViewById(R.id.icon_tab_settings);
         mLblSettings = findViewById(R.id.lbl_tab_settings);
 
         // Dashboard outputs
@@ -264,29 +256,13 @@ public class MainActivity extends AppCompatActivity {
         mSettingsProfileInitials = findViewById(R.id.settings_profile_initials);
         mSettingsProfileName = findViewById(R.id.settings_profile_name);
         mSettingsProfileEmail = findViewById(R.id.settings_profile_email);
-        
-        // Member Widgets
-        mMemberAlexInitials = findViewById(R.id.member_alex_initials);
-        mMemberAlexName = findViewById(R.id.member_alex_name);
 
-        // Group workspace copy layouts
-        mWrapCopyInvite = findViewById(R.id.wrap_copy_invite);
-        mGroupInviteCode = findViewById(R.id.group_invite_code);
-        mBtnInviteAction = findViewById(R.id.btn_invite_action);
-        mBtnAddMemberMock = findViewById(R.id.btn_add_member_mock);
-        mMembersContainer = findViewById(R.id.container_members);
         mRecentActivityContainer = findViewById(R.id.container_recent_activities);
 
         // Settings
         mBtnLogout = findViewById(R.id.btn_logout);
         mBtnResetSpent = findViewById(R.id.btn_reset_spent);
-        mInputActiveGroupCode = findViewById(R.id.input_active_group_code);
-        mBtnJoinGroup = findViewById(R.id.btn_join_group);
-        mSwitchDarkMode = findViewById(R.id.switch_dark_mode);
-        mSpinnerLanguage = findViewById(R.id.spinner_language);
     }
-
-    private TextView mMemberAlexInitials, mMemberAlexName;
 
     private void initFirebase() {
         try {
@@ -397,28 +373,54 @@ public class MainActivity extends AppCompatActivity {
         if (mBtnTileAllocatedFunds != null) {
             mBtnTileAllocatedFunds.setOnClickListener(v -> showAllocationsDetailDialog());
         }
+
+        if (mDashboardAllocatedLbl != null) {
+            mDashboardAllocatedLbl.setOnClickListener(v -> showAllocationsDetailDialog());
+        }
     }
 
     private void showAllocationsDetailDialog() {
-        if (mAllocationsList.isEmpty()) {
+        if (mAllocationsList == null || mAllocationsList.isEmpty()) {
             Toast.makeText(this, "No funds currently allocated.", Toast.LENGTH_SHORT).show();
             return;
         }
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(60, 40, 60, 40);
+        float density = getResources().getDisplayMetrics().density;
+        container.setPadding((int)(20 * density), (int)(16 * density), (int)(20 * density), (int)(16 * density));
 
-        for (int i = 0; i < mAllocationsList.size(); i++) {
-            Map<String, Object> alloc = mAllocationsList.get(i);
+        TextView infoTv = new TextView(this);
+        infoTv.setText("Tap an allocation below to edit or delete it.");
+        infoTv.setTextColor(getResources().getColor(R.color.text_muted));
+        infoTv.setTextSize(12);
+        infoTv.setPadding(0, 0, 0, (int)(12 * density));
+        container.addView(infoTv);
+
+        final AlertDialog detailDialog = new AlertDialog.Builder(this)
+                .setTitle("Allocated Funds Breakdown")
+                .setView(container)
+                .setPositiveButton("Close", null)
+                .create();
+
+        for (int aIdx = 0; aIdx < mAllocationsList.size(); aIdx++) {
+            Map<String, Object> alloc = mAllocationsList.get(aIdx);
+            if (alloc == null) continue;
             String title = (String) alloc.get("title");
-            Double amount = 0.0;
-            if (alloc.get("amount") instanceof Double) amount = (Double) alloc.get("amount");
-            else if (alloc.get("amount") instanceof Long) amount = ((Long) alloc.get("amount")).doubleValue();
+            double amount = 0.0;
+            if (alloc.get("amount") instanceof Number) {
+                amount = ((Number) alloc.get("amount")).doubleValue();
+            }
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(0, 10, 0, 10);
+            row.setPadding((int)(8 * density), (int)(12 * density), (int)(8 * density), (int)(12 * density));
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            android.util.TypedValue outValue = new android.util.TypedValue();
+            getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+            row.setBackgroundResource(outValue.resourceId);
 
             TextView titleTv = new TextView(this);
             titleTv.setText(title);
@@ -427,19 +429,142 @@ public class MainActivity extends AppCompatActivity {
             titleTv.setTypeface(null, Typeface.BOLD);
 
             TextView amountTv = new TextView(this);
-            amountTv.setText(String.format("$%,.2f", amount));
-            amountTv.setTextColor(ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]);
+            amountTv.setText(String.format(Locale.US, "$%,.2f", amount));
+            amountTv.setTextColor(ALLOCATION_COLORS[aIdx % ALLOCATION_COLORS.length]);
             amountTv.setTypeface(null, Typeface.BOLD);
 
             row.addView(titleTv);
             row.addView(amountTv);
+
+            final int index = aIdx;
+            final String finalTitle = title;
+            final double finalAmount = amount;
+            row.setOnClickListener(v -> {
+                detailDialog.dismiss();
+                showEditAllocationDialog(index, finalTitle, finalAmount);
+            });
+
             container.addView(row);
         }
 
+        detailDialog.show();
+    }
+
+    private void showEditAllocationDialog(final int index, final String currentTitle, final double currentAmount) {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.layout_manual_input, null);
+        final EditText amountInput = dialogView.findViewById(R.id.input_item_price);
+        final EditText reasonInput = dialogView.findViewById(R.id.input_item_name);
+        
+        // Hide irrelevant fields
+        dialogView.findViewById(R.id.layout_category_selection).setVisibility(View.GONE);
+        dialogView.findViewById(R.id.layout_date_selection).setVisibility(View.GONE);
+
+        TextView nameLabel = dialogView.findViewById(R.id.label_item_name);
+        if (nameLabel != null) nameLabel.setText("Allocation Name");
+        TextView priceLabel = dialogView.findViewById(R.id.label_item_price);
+        if (priceLabel != null) priceLabel.setText("Allocated Amount ($)");
+
+        reasonInput.setHint("What are you allocating for? (e.g. Travel)");
+        reasonInput.setText(currentTitle);
+        amountInput.setHint("Enter amount to allocate");
+        amountInput.setText(String.valueOf(currentAmount));
+
         new AlertDialog.Builder(this)
-                .setTitle("Allocated Funds Breakdown")
-                .setView(container)
-                .setPositiveButton("Close", null)
+                .setTitle("Edit Allocation")
+                .setView(dialogView)
+                .setPositiveButton("Update", (d, w) -> {
+                    String newTitle = reasonInput.getText().toString().trim();
+                    String amountStr = amountInput.getText().toString().trim();
+                    if (!newTitle.isEmpty() && !amountStr.isEmpty()) {
+                        try {
+                            double newAmount = Double.parseDouble(amountStr);
+                            
+                            if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
+                                List<Map<String, Object>> updatedAllocations = new ArrayList<>(mAllocationsList);
+                                if (index >= 0 && index < updatedAllocations.size()) {
+                                    Map<String, Object> alloc = new HashMap<>(updatedAllocations.get(index));
+                                    alloc.put("title", newTitle);
+                                    alloc.put("amount", newAmount);
+                                    updatedAllocations.set(index, alloc);
+                                    
+                                    double newBudgetReserved = 0.0;
+                                    for (Map<String, Object> a : updatedAllocations) {
+                                        if (a != null && a.get("amount") instanceof Number) {
+                                            newBudgetReserved += ((Number) a.get("amount")).doubleValue();
+                                        }
+                                    }
+                                    
+                                    mGroupRef.update("allocations", updatedAllocations, "budgetReserved", newBudgetReserved);
+                                    
+                                    // Log activity
+                                    Map<String, Object> activity = new HashMap<>();
+                                    activity.put("title", "Allocation Edited");
+                                    activity.put("desc", "Updated allocation: " + newTitle + " ($" + newAmount + ")");
+                                    activity.put("amount", 0.0);
+                                    activity.put("emoji", "✏️");
+                                    activity.put("timestamp", FieldValue.serverTimestamp());
+                                    mGroupRef.collection("activities").add(activity);
+                                    
+                                    Toast.makeText(this, "Allocation updated!", Toast.LENGTH_SHORT).show();
+                                }
+                            } else {
+                                // Local fallback
+                                if (index >= 0 && index < mAllocationsList.size()) {
+                                    mBudgetReserved -= currentAmount;
+                                    mBudgetReserved += newAmount;
+                                    
+                                    Map<String, Object> alloc = mAllocationsList.get(index);
+                                    if (alloc != null) {
+                                        alloc.put("title", newTitle);
+                                        alloc.put("amount", newAmount);
+                                    }
+                                    
+                                    applyLocalMockData();
+                                    Toast.makeText(this, "Allocation updated (Local)", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        } catch (NumberFormatException e) {
+                            Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNeutralButton("Delete", (d, w) -> {
+                    if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
+                        List<Map<String, Object>> updatedAllocations = new ArrayList<>(mAllocationsList);
+                        if (index >= 0 && index < updatedAllocations.size()) {
+                            updatedAllocations.remove(index);
+                            
+                            double newBudgetReserved = 0.0;
+                            for (Map<String, Object> a : updatedAllocations) {
+                                if (a != null && a.get("amount") instanceof Number) {
+                                    newBudgetReserved += ((Number) a.get("amount")).doubleValue();
+                                }
+                            }
+                            
+                            mGroupRef.update("allocations", updatedAllocations, "budgetReserved", newBudgetReserved);
+                            
+                            // Log activity
+                            Map<String, Object> activity = new HashMap<>();
+                            activity.put("title", "Allocation Deleted");
+                            activity.put("desc", "Removed allocation: " + currentTitle);
+                            activity.put("amount", 0.0);
+                            activity.put("emoji", "🗑️");
+                            activity.put("timestamp", FieldValue.serverTimestamp());
+                            mGroupRef.collection("activities").add(activity);
+                            
+                            Toast.makeText(this, "Allocation deleted!", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        // Local fallback
+                        if (index >= 0 && index < mAllocationsList.size()) {
+                            mBudgetReserved -= currentAmount;
+                            mAllocationsList.remove(index);
+                            applyLocalMockData();
+                            Toast.makeText(this, "Allocation deleted (Local)", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .setNegativeButton("Cancel", null)
                 .show();
     }
 
@@ -465,7 +590,7 @@ public class MainActivity extends AppCompatActivity {
                         try {
                             double amount = Double.parseDouble(amountStr);
                             
-                            if (isFirebaseAvailable && mGroupRef != null) {
+                            if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
                                 Map<String, Object> allocation = new HashMap<>();
                                 allocation.put("title", reason);
                                 allocation.put("amount", amount);
@@ -486,7 +611,7 @@ public class MainActivity extends AppCompatActivity {
                                 localAlloc.put("title", reason);
                                 localAlloc.put("amount", amount);
                                 mAllocationsList.add(localAlloc);
-                                updateRatioBar();
+                                applyLocalMockData();
                                 Toast.makeText(this, "Allocated $" + amount + " for " + reason + " (Local)", Toast.LENGTH_SHORT).show();
                             }
                         } catch (NumberFormatException e) {
@@ -574,7 +699,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                     } catch (IOException ignored) {}
                     Log.e("Groq", "Analysis failed: " + response.code() + " - " + errorMsg);
-                    String finalErrorMsg = errorMsg;
                     runOnUiThread(() -> Toast.makeText(MainActivity.this, "AI Analysis failed: " + response.code(), Toast.LENGTH_SHORT).show());
                 }
             }
@@ -699,7 +823,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (amount != null && amount != 0) {
                 TextView amountTv = new TextView(this);
-                amountTv.setText((amount > 0 ? "+" : "") + String.format("$%,.2f", amount));
+                amountTv.setText((amount > 0 ? "+" : "") + String.format(Locale.US, "$%,.2f", amount));
                 amountTv.setTextColor(getResources().getColor(amount > 0 ? R.color.growth_green : R.color.urgency_red));
                 amountTv.setTextSize(14);
                 amountTv.setTypeface(null, Typeface.BOLD);
@@ -708,7 +832,6 @@ public class MainActivity extends AppCompatActivity {
                 amountParams.addRule(RelativeLayout.CENTER_VERTICAL);
                 amountTv.setLayoutParams(amountParams);
                 row.addView(amountTv);
-                textParams.addRule(RelativeLayout.START_OF, amountTv.getId()); // Avoid overlap
             }
 
             row.setOnClickListener(v -> {
@@ -746,100 +869,8 @@ public class MainActivity extends AppCompatActivity {
         // No-op for now as rows are dynamic
     }
 
-    private void showEditActivityDialog(View row) {
-        // Implementation for updating title
-    }
-
     private void setupGroupListeners() {
-        if (mWrapCopyInvite != null) {
-            mWrapCopyInvite.setOnClickListener(v -> {
-                if (mGroupInviteCode == null) return;
-                String code = mGroupInviteCode.getText().toString();
-                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("Stashly Invite Code", code);
-                if (clipboard != null) {
-                    clipboard.setPrimaryClip(clip);
-                    com.google.android.material.snackbar.Snackbar.make(v, "Code " + code + " copied!", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        if (mBtnInviteAction != null) {
-            mBtnInviteAction.setOnClickListener(v -> {
-                Intent sendIntent = new Intent();
-                sendIntent.setAction(Intent.ACTION_SEND);
-                sendIntent.putExtra(Intent.EXTRA_TEXT, "Join my Stashly workspace using code: " + mInviteCode);
-                sendIntent.setType("text/plain");
-                startActivity(Intent.createChooser(sendIntent, "Share Invite Code"));
-            });
-        }
-
-        if (mBtnAddMemberMock != null) {
-            mBtnAddMemberMock.setOnClickListener(v -> showAddMemberDialog());
-        }
-    }
-
-    private void showAddMemberDialog() {
-        EditText input = new EditText(this);
-        input.setHint("Name or Email");
-        new AlertDialog.Builder(this)
-                .setTitle("Invite Member")
-                .setMessage("Enter the identifier for the person you want to add.")
-                .setView(input)
-                .setPositiveButton("Send Invite", (d, w) -> {
-                    String identifier = input.getText().toString();
-                    if (!identifier.isEmpty()) {
-                        if (isFirebaseAvailable && mGroupRef != null) {
-                            mGroupRef.update("members", FieldValue.arrayUnion(identifier))
-                                    .addOnSuccessListener(aVoid -> com.google.android.material.snackbar.Snackbar.make(mGroupView, "Invite sent to " + identifier, com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show());
-                        } else {
-                            addMemberToUI(identifier);
-                        }
-                    }
-                })
-                .setNegativeButton("Cancel", null)
-                .show();
-    }
-
-    private void addMemberToUI(String name) {
-        if (mMembersContainer == null) return;
-        
-        float density = getResources().getDisplayMetrics().density;
-        String initials = name.length() > 1 ? name.substring(0, 2).toUpperCase() : name.toUpperCase();
-        
-        LinearLayout memberLayout = new LinearLayout(this);
-        LinearLayout.LayoutParams memberParams = new LinearLayout.LayoutParams((int) (72 * density), LinearLayout.LayoutParams.WRAP_CONTENT);
-        memberParams.setMargins(0, 0, (int) (12 * density), 0);
-        memberLayout.setLayoutParams(memberParams);
-        memberLayout.setOrientation(LinearLayout.VERTICAL);
-        memberLayout.setGravity(android.view.Gravity.CENTER);
-
-        FrameLayout frame = new FrameLayout(this);
-        frame.setLayoutParams(new LinearLayout.LayoutParams((int) (54 * density), (int) (54 * density)));
-        frame.setBackgroundResource(R.drawable.input_field_background);
-
-        TextView initialsTv = new TextView(this);
-        FrameLayout.LayoutParams textParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
-        initialsTv.setLayoutParams(textParams);
-        initialsTv.setGravity(android.view.Gravity.CENTER);
-        initialsTv.setText(initials);
-        initialsTv.setTextColor(getResources().getColor(R.color.primary));
-        initialsTv.setTextSize(14);
-        initialsTv.setTypeface(null, Typeface.BOLD);
-
-        frame.addView(initialsTv);
-        memberLayout.addView(frame);
-
-        TextView nameTv = new TextView(this);
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        nameParams.topMargin = (int) (6 * density);
-        nameTv.setLayoutParams(nameParams);
-        nameTv.setText(name);
-        nameTv.setTextColor(getResources().getColor(R.color.primary));
-        nameTv.setTextSize(11);
-        
-        memberLayout.addView(nameTv);
-        mMembersContainer.addView(memberLayout, mMembersContainer.getChildCount() - 1);
+        // Now handled dynamically in render methods
     }
 
     private void setupSettingsListeners() {
@@ -870,7 +901,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         updateRatioBar();
 
-                        if (isFirebaseAvailable && mGroupRef != null) {
+                        if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
                             mGroupRef.update("budgetSpent", 0.0)
                                 .addOnSuccessListener(aVoid -> {
                                     Toast.makeText(MainActivity.this, "Spent money reset!", Toast.LENGTH_SHORT).show();
@@ -888,50 +919,6 @@ public class MainActivity extends AppCompatActivity {
                     })
                     .setNegativeButton("Cancel", null)
                     .show());
-        }
-
-        if (mBtnJoinGroup != null) {
-            mBtnJoinGroup.setOnClickListener(v -> {
-                if (mInputActiveGroupCode == null) return;
-                String newCode = mInputActiveGroupCode.getText().toString().trim().toUpperCase();
-                if (newCode.isEmpty()) {
-                    mInputActiveGroupCode.setError("Code required");
-                    return;
-                }
-                mInviteCode = newCode;
-                if (mGroupInviteCode != null) mGroupInviteCode.setText(newCode);
-                if (isFirebaseAvailable && mFirestore != null) {
-                    if (mGroupListener != null) mGroupListener.remove();
-                    mGroupRef = mFirestore.collection("groups").document(newCode);
-                    fetchGroupData();
-                    Toast.makeText(this, "Syncing to group " + newCode, Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        if (mSwitchDarkMode != null) {
-            mSwitchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) {
-                    androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES);
-                } else {
-                    androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
-                }
-            });
-        }
-
-        if (mSpinnerLanguage != null) {
-            String[] languages = {"English", "Armenian", "Russian"};
-            android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, languages);
-            mSpinnerLanguage.setAdapter(adapter);
-            mSpinnerLanguage.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                    if (position > 0) {
-                        Toast.makeText(MainActivity.this, "Language set to " + languages[position], Toast.LENGTH_SHORT).show();
-                    }
-                }
-                @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-            });
         }
     }
 
@@ -952,7 +939,7 @@ public class MainActivity extends AppCompatActivity {
         if (dateLayout != null) dateLayout.setVisibility(View.GONE);
 
         budgetInput.setHint("Enter new monthly budget");
-        budgetInput.setText(String.format("%.0f", mCurrentBudgetCap));
+        budgetInput.setText(String.format(Locale.US, "%.0f", mCurrentBudgetCap));
 
         new AlertDialog.Builder(this)
                 .setTitle("Update Monthly Budget")
@@ -962,32 +949,7 @@ public class MainActivity extends AppCompatActivity {
                     if (!budgetStr.isEmpty()) {
                         try {
                             double newBudget = Double.parseDouble(budgetStr);
-                            mCurrentBudgetCap = newBudget;
-                            
-                            // Update UI
-                            if (mDashboardBudgetAllocated != null) {
-                                mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", newBudget));
-                            }
-                            updateRatioBar();
-
-                            // Sync to Firebase
-                            if (isFirebaseAvailable && mGroupRef != null) {
-                                Map<String, Object> updates = new HashMap<>();
-                                updates.put("budgetCap", newBudget);
-                                mGroupRef.update(updates)
-                                    .addOnSuccessListener(aVoid -> {
-                                        Toast.makeText(MainActivity.this, "Budget updated!", Toast.LENGTH_SHORT).show();
-                                        
-                                        // Log activity
-                                        Map<String, Object> activity = new HashMap<>();
-                                        activity.put("title", "Budget Updated");
-                                        activity.put("desc", "New monthly limit: $" + newBudget);
-                                        activity.put("amount", 0.0);
-                                        activity.put("emoji", "💰");
-                                        activity.put("timestamp", FieldValue.serverTimestamp());
-                                        mGroupRef.collection("activities").add(activity);
-                                    });
-                            }
+                            performBudgetUpdate(newBudget);
                         } catch (NumberFormatException e) {
                             Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
                         }
@@ -995,6 +957,39 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void performBudgetUpdate(double newBudget) {
+        if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
+            // Role check: Only admins can update the group budget
+            if (!"admin".equals(mUserRole)) {
+                Toast.makeText(this, "Only admins can change the shared budget.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("monthlyBudget", newBudget);
+            
+            mGroupRef.update(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(MainActivity.this, "Group Budget updated!", Toast.LENGTH_SHORT).show();
+                    
+                    // Log activity
+                    Map<String, Object> activity = new HashMap<>();
+                    activity.put("title", "Budget Updated");
+                    activity.put("desc", "New shared limit: $" + newBudget);
+                    activity.put("amount", 0.0);
+                    activity.put("emoji", "💰");
+                    activity.put("timestamp", FieldValue.serverTimestamp());
+                    mGroupRef.collection("activities").add(activity);
+                })
+                .addOnFailureListener(e -> Toast.makeText(MainActivity.this, "Failed to update budget.", Toast.LENGTH_SHORT).show());
+        } else {
+            // Local fallback
+            mCurrentBudgetCap = newBudget;
+            applyLocalMockData();
+            Toast.makeText(this, "Individual budget updated!", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showScanOptionsBottomSheet() {
@@ -1177,7 +1172,7 @@ public class MainActivity extends AppCompatActivity {
             TextView categoryTv = row.findViewById(R.id.staged_item_category);
             
             nameTv.setText(item.name);
-            priceTv.setText("$" + String.format("%.2f", item.price));
+            priceTv.setText("$" + String.format(Locale.US, "%.2f", item.price));
             emojiTv.setText(item.emoji);
             categoryTv.setText(item.category);
 
@@ -1267,7 +1262,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void confirmStagedItem(String name, double price, String category, String emoji, String prodDate, String expDate) {
-        if (isFirebaseAvailable && mGroupRef != null) {
+        String currentUserName = (mAuth.getCurrentUser() != null) ? mAuth.getCurrentUser().getEmail().split("@")[0] : "Someone";
+
+        if (isFirebaseAvailable && mGroupRef != null && mCurrentGroupId != null) {
             Map<String, Object> item = new HashMap<>();
             item.put("name", name);
             item.put("price", price);
@@ -1275,6 +1272,7 @@ public class MainActivity extends AppCompatActivity {
             item.put("emoji", emoji);
             item.put("productionDate", prodDate);
             item.put("expiryDate", expDate);
+            item.put("addedDate", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
 
             mGroupRef.collection("items").add(item);
             mGroupRef.update("budgetSpent", FieldValue.increment(price));
@@ -1283,7 +1281,7 @@ public class MainActivity extends AppCompatActivity {
 
             // Log activity
             Map<String, Object> activity = new HashMap<>();
-            activity.put("title", name + " Added");
+            activity.put("title", currentUserName + " confirmed " + name);
             activity.put("desc", category + " item added to stash");
             activity.put("amount", -price);
             activity.put("emoji", emoji);
@@ -1294,8 +1292,21 @@ public class MainActivity extends AppCompatActivity {
         } else {
             mCurrentBudgetSpent += price;
             mActiveAssetsValue += price;
-            mLiquidCash -= price;
+            
+            Map<String, Object> localItem = new HashMap<>();
+            localItem.put("id", String.valueOf(System.currentTimeMillis()));
+            localItem.put("name", name);
+            localItem.put("price", price);
+            localItem.put("category", category);
+            localItem.put("emoji", emoji);
+            localItem.put("productionDate", prodDate);
+            localItem.put("expiryDate", expDate);
+            localItem.put("addedDate", new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()));
+            
+            mLocalItems.add(localItem);
+            
             applyLocalMockData();
+            renderInventoryItems(null);
             Toast.makeText(this, name + " added (Local Mode)", Toast.LENGTH_SHORT).show();
         }
     }
@@ -1320,41 +1331,244 @@ public class MainActivity extends AppCompatActivity {
 
     private void applyLocalMockData() {
         try {
-            if (mDashboardBudgetAllocated != null) mDashboardBudgetAllocated.setText(" / $" + String.format("%,.2f", mCurrentBudgetCap));
-            if (mDashboardBudgetSpentLbl != null) mDashboardBudgetSpentLbl.setText("$" + String.format("%,.0f", mCurrentBudgetSpent));
-            if (mDashboardAssetsVal != null) mDashboardAssetsVal.setText("$" + String.format("%,.2f", mActiveAssetsValue));
-            if (mDashboardLiquidVal != null) mDashboardLiquidVal.setText("$" + String.format("%,.2f", mLiquidCash));
+            if (mDashboardBudgetAllocated != null) mDashboardBudgetAllocated.setText(" / $" + String.format(Locale.US, "%,.2f", mCurrentBudgetCap));
+            if (mDashboardBudgetSpentLbl != null) mDashboardBudgetSpentLbl.setText("$" + String.format(Locale.US, "%,.0f", mCurrentBudgetSpent));
+            if (mDashboardAssetsVal != null) mDashboardAssetsVal.setText("$" + String.format(Locale.US, "%,.2f", mBudgetReserved));
             
-            TextView groupTitle = findViewById(R.id.group_workspace_title);
-            if (groupTitle != null) groupTitle.setText(mWorkspaceName);
+            // Role based visibility for Home Edit Button
+            if (mBtnEditBudget != null) {
+                if (mCurrentGroupId != null) {
+                    mBtnEditBudget.setVisibility("admin".equals(mUserRole) ? View.VISIBLE : View.GONE);
+                } else {
+                    mBtnEditBudget.setVisibility(View.VISIBLE);
+                }
+            }
+
+            // Calculate Liquid Cash: Total Budget - Allocated Funds - Confirmed Products (Spent)
+            double calculatedLiquid = mCurrentBudgetCap - mBudgetReserved - mCurrentBudgetSpent;
+            if (mDashboardLiquidVal != null) mDashboardLiquidVal.setText("$" + String.format(Locale.US, "%,.2f", calculatedLiquid));
+            
             updateRatioBar();
         } catch (Throwable t) {}
     }
 
+    private void observeUserState() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) {
+            applyLocalMockData();
+            return;
+        }
+
+        DocumentReference userRef = mFirestore.collection("users").document(user.getUid());
+        
+        // Ensure user document exists
+        userRef.get().addOnSuccessListener(documentSnapshot -> {
+            if (!documentSnapshot.exists()) {
+                Map<String, Object> userData = new HashMap<>();
+                userData.put("email", user.getEmail());
+                userData.put("currentGroupId", null);
+                userRef.set(userData);
+            }
+        });
+
+        mUserListener = userRef.addSnapshotListener((snapshot, e) -> {
+            if (e != null || snapshot == null) return;
+            
+            mCurrentGroupId = snapshot.getString("currentGroupId");
+            if (mCurrentGroupId == null || mCurrentGroupId.isEmpty()) {
+                mAllocationsList = new ArrayList<>();
+                renderGroupOnboarding();
+            } else {
+                mGroupRef = mFirestore.collection("groups").document(mCurrentGroupId);
+                fetchGroupData();
+                renderGroupDashboard();
+            }
+        });
+    }
+
+    private void renderGroupOnboarding() {
+        if (mGroupView == null) return;
+        mGroupView.removeAllViews();
+        View onboarding = getLayoutInflater().inflate(R.layout.layout_group_onboarding, mGroupView, false);
+        
+        final EditText nameInput = onboarding.findViewById(R.id.input_create_group_name);
+        onboarding.findViewById(R.id.btn_action_create_group).setOnClickListener(v -> {
+            String name = nameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                nameInput.setError("Name required");
+                return;
+            }
+            createGroup(name);
+        });
+
+        final EditText codeInput = onboarding.findViewById(R.id.input_join_group_code);
+        onboarding.findViewById(R.id.btn_action_join_group).setOnClickListener(v -> {
+            String code = codeInput.getText().toString().trim().toUpperCase();
+            if (code.length() != 6) {
+                codeInput.setError("Invalid code");
+                return;
+            }
+            joinGroup(code);
+        });
+
+        mGroupView.addView(onboarding);
+    }
+
+    private void createGroup(String name) {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) return;
+
+        String code = generateGroupCode();
+        String groupId = mFirestore.collection("groups").document().getId();
+        String userName = user.getEmail().split("@")[0];
+
+        Map<String, String> members = new HashMap<>();
+        members.put(user.getUid(), "admin");
+
+        Map<String, String> memberNames = new HashMap<>();
+        memberNames.put(user.getUid(), userName);
+
+        Map<String, Object> groupData = new HashMap<>();
+        groupData.put("groupId", groupId);
+        groupData.put("groupCode", code);
+        groupData.put("groupName", name);
+        groupData.put("adminId", user.getUid());
+        groupData.put("monthlyBudget", 0.0);
+        groupData.put("budgetSpent", 0.0);
+        groupData.put("budgetReserved", 0.0);
+        groupData.put("activeAssetsValue", 0.0);
+        groupData.put("liquidCash", 0.0);
+        groupData.put("members", members);
+        groupData.put("memberNames", memberNames);
+
+        mFirestore.collection("groups").document(groupId).set(groupData)
+                .addOnSuccessListener(aVoid -> {
+                    mFirestore.collection("users").document(user.getUid())
+                            .update("currentGroupId", groupId);
+                    Toast.makeText(this, "Workspace Created: " + code, Toast.LENGTH_LONG).show();
+                });
+    }
+
+    private void joinGroup(String code) {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null) return;
+        String userName = user.getEmail().split("@")[0];
+
+        mFirestore.collection("groups").whereEqualTo("groupCode", code).get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    if (queryDocumentSnapshots.isEmpty()) {
+                        Toast.makeText(this, "Group not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String groupId = queryDocumentSnapshots.getDocuments().get(0).getId();
+                    mFirestore.collection("groups").document(groupId)
+                            .update("members." + user.getUid(), "casual",
+                                   "memberNames." + user.getUid(), userName)
+                            .addOnSuccessListener(aVoid -> {
+                                mFirestore.collection("users").document(user.getUid())
+                                        .update("currentGroupId", groupId);
+                                Toast.makeText(this, "Joined Workspace!", Toast.LENGTH_SHORT).show();
+                            });
+                });
+    }
+
+    private String generateGroupCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        StringBuilder code = new StringBuilder();
+        java.util.Random rnd = new java.util.Random();
+        while (code.length() < 6) {
+            code.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return code.toString();
+    }
+
+    private void renderGroupDashboard() {
+        if (mGroupView == null) return;
+        mGroupView.removeAllViews();
+        View dashboard = getLayoutInflater().inflate(R.layout.fragment_group_dashboard, mGroupView, false);
+        mGroupView.addView(dashboard);
+        
+        // Listeners for group dashboard elements will be setup in fetchGroupData
+    }
+
     private void fetchGroupData() {
         if (isFirebaseAvailable && mGroupRef != null) {
+            // Remove previous listeners if they exist
+            if (mGroupListener != null) mGroupListener.remove();
+            if (mItemsListener != null) mItemsListener.remove();
+
             mGroupListener = mGroupRef.addSnapshotListener((snapshot, e) -> {
                 if (e != null || snapshot == null || !snapshot.exists()) {
-                    if (snapshot != null && !snapshot.exists()) provisionFirestoreDefaults();
-                    applyLocalMockData();
                     return;
                 }
-                mCurrentBudgetCap = snapshot.getDouble("budgetCap") != null ? snapshot.getDouble("budgetCap") : 10000.0;
-                mCurrentBudgetSpent = snapshot.getDouble("budgetSpent") != null ? snapshot.getDouble("budgetSpent") : 0.0;
-                mBudgetReserved = snapshot.getDouble("budgetReserved") != null ? snapshot.getDouble("budgetReserved") : 0.0;
-                mActiveAssetsValue = snapshot.getDouble("activeAssetsValue") != null ? snapshot.getDouble("activeAssetsValue") : 0.0;
-                mLiquidCash = snapshot.getDouble("liquidCash") != null ? snapshot.getDouble("liquidCash") : 0.0;
-                mWorkspaceName = snapshot.getString("workspaceName") != null ? snapshot.getString("workspaceName") : "Workspace";
-                List<String> members = (List<String>) snapshot.get("members");
-                if (members != null) { mMembersList = members; syncMembersToUI(); }
-                List<Map<String, Object>> allocations = (List<Map<String, Object>>) snapshot.get("allocations");
-                if (allocations != null) { mAllocationsList = allocations; }
+                
+                String name = snapshot.getString("groupName");
+                String code = snapshot.getString("groupCode");
+                Double budget = snapshot.getDouble("monthlyBudget");
+                Double spent = snapshot.getDouble("budgetSpent");
+                Double reserved = snapshot.getDouble("budgetReserved");
+                Double assets = snapshot.getDouble("activeAssetsValue");
+                
+                if (budget == null) budget = 0.0;
+                if (spent == null) spent = 0.0;
+                if (reserved == null) reserved = 0.0;
+                if (assets == null) assets = 0.0;
+
+                // Liquid Cash = Total Budget - Spent - Reserved (Allocated)
+                double liquid = budget - spent - reserved;
+
+                Object allocsObj = snapshot.get("allocations");
+                if (allocsObj instanceof List) {
+                    mAllocationsList = new ArrayList<>((List<Map<String, Object>>) allocsObj);
+                } else {
+                    mAllocationsList = new ArrayList<>();
+                }
+
+                Object membersObj = snapshot.get("members");
+                Map<String, String> members = null;
+                if (membersObj instanceof Map) {
+                    members = (Map<String, String>) membersObj;
+                } else if (membersObj instanceof List) {
+                    // Fallback for corrupted data (converted to array by arrayUnion)
+                    members = new HashMap<>();
+                    List<?> memberList = (List<?>) membersObj;
+                    for (Object m : memberList) {
+                        if (m != null) members.put(m.toString(), "casual");
+                    }
+                }
+                
+                if (members == null) members = new HashMap<>();
+
+                Object namesObj = snapshot.get("memberNames");
+                Map<String, String> memberNames = null;
+                if (namesObj instanceof Map) {
+                    memberNames = (Map<String, String>) namesObj;
+                }
+                if (memberNames == null) memberNames = new HashMap<>();
+                
+                FirebaseUser user = mAuth.getCurrentUser();
+                if (user != null) {
+                    mUserRole = members.get(user.getUid());
+                }
+
+                // Update shared dashboard UI
+                updateGroupUI(name, code, budget, spent, assets, liquid, members, memberNames);
+                
+                // Also update local state for the main dashboard if this is the active group
+                mCurrentBudgetCap = budget;
+                mCurrentBudgetSpent = spent;
+                mActiveAssetsValue = assets;
+                mLiquidCash = liquid;
+                mBudgetReserved = reserved;
+                mWorkspaceName = name;
                 applyLocalMockData();
             });
+
             mItemsListener = mGroupRef.collection("items").addSnapshotListener((snapshots, e) -> {
                 if (e != null || snapshots == null) return;
                 renderInventoryItems(snapshots);
             });
+
             mGroupRef.collection("activities")
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .limit(10)
@@ -1362,10 +1576,248 @@ public class MainActivity extends AppCompatActivity {
                     if (e != null || snapshots == null) return;
                     mLastActivitiesSnapshot = snapshots;
                     renderActivities(snapshots);
+                    // Update the timeline in the group tab
+                    LinearLayout activitiesContainer = mGroupView.findViewById(R.id.container_group_activities);
+                    if (activitiesContainer != null) {
+                        renderActivitiesTimeline(activitiesContainer, snapshots);
+                    }
                 });
-        } else {
-            applyLocalMockData();
         }
+    }
+
+    private void updateGroupUI(String name, String code, Double budget, Double spent, Double assets, Double liquid, Map<String, String> members, Map<String, String> memberNames) {
+        View v = mGroupView.getChildAt(0);
+        if (v == null || v.findViewById(R.id.group_display_name) == null) return; // Not the dashboard
+
+        TextView nameTv = v.findViewById(R.id.group_display_name);
+        TextView codeTv = v.findViewById(R.id.group_display_code);
+        View adminControls = v.findViewById(R.id.admin_budget_controls);
+        View adminBadge = v.findViewById(R.id.admin_badge);
+
+        if (nameTv != null) nameTv.setText(name);
+        if (codeTv != null) codeTv.setText(code);
+        
+        // Financial Metrics
+        double bVal = (budget != null) ? budget : 0.0;
+        double sVal = (spent != null) ? spent : 0.0;
+        
+        TextView spentTv = v.findViewById(R.id.group_budget_spent);
+        TextView totalTv = v.findViewById(R.id.group_budget_total);
+        View progress = v.findViewById(R.id.group_budget_progress);
+        TextView liquidTv = v.findViewById(R.id.group_liquid_cash);
+
+        if (spentTv != null) spentTv.setText(String.format(Locale.US, "$%,.0f", sVal));
+        if (totalTv != null) totalTv.setText(String.format(Locale.US, " / $%,.2f", bVal));
+        
+        if (progress != null) {
+            float ratio = (bVal > 0) ? (float)(sVal / bVal) : 0;
+            progress.post(() -> {
+                ViewGroup.LayoutParams lp = progress.getLayoutParams();
+                lp.width = (int) (progress.getParent() instanceof View ? ((View)progress.getParent()).getWidth() * Math.min(ratio, 1.0f) : 0);
+                progress.setLayoutParams(lp);
+            });
+        }
+
+        if (liquidTv != null) liquidTv.setText(String.format(Locale.US, "$%,.2f", liquid));
+
+        // Role based visibility
+        boolean isAdmin = "admin".equals(mUserRole);
+        if (adminBadge != null) adminBadge.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+        if (adminControls != null) adminControls.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+
+        // Sync Logic
+        final EditText syncInput = v.findViewById(R.id.input_group_code_sync);
+        Button syncBtn = v.findViewById(R.id.btn_sync_group);
+        if (syncBtn != null && syncInput != null) {
+            syncBtn.setOnClickListener(view -> {
+                String newCode = syncInput.getText().toString().trim().toUpperCase();
+                if (newCode.length() == 6) {
+                    joinGroup(newCode);
+                    syncInput.setText("");
+                } else {
+                    syncInput.setError("Invalid Code");
+                }
+            });
+        }
+
+        // Budget Update Logic (Admin Only)
+        if (isAdmin && adminControls != null) {
+            final EditText budgetInput = v.findViewById(R.id.input_group_budget);
+            v.findViewById(R.id.btn_update_group_budget).setOnClickListener(view -> {
+                String val = budgetInput.getText().toString().trim();
+                if (!val.isEmpty()) {
+                    try {
+                        double newBudget = Double.parseDouble(val);
+                        performBudgetUpdate(newBudget);
+                        budgetInput.setText("");
+                    } catch (Exception ex) {}
+                }
+            });
+        }
+
+        // Horizontal Members List
+        LinearLayout membersContainer = v.findViewById(R.id.container_group_members_horizontal);
+        if (membersContainer != null && members != null) {
+            renderGroupMembersHorizontal(membersContainer, members, memberNames, isAdmin);
+        }
+
+        // Activity Feed Rendering (Timeline)
+        LinearLayout activitiesContainer = v.findViewById(R.id.container_group_activities);
+        if (activitiesContainer != null && mLastActivitiesSnapshot != null) {
+            renderActivitiesTimeline(activitiesContainer, mLastActivitiesSnapshot);
+        }
+
+        v.findViewById(R.id.btn_leave_group).setOnClickListener(view -> leaveGroup());
+        
+        v.findViewById(R.id.group_code_container).setOnClickListener(view -> {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("Group Code", code);
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(this, "Code Copied", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void renderActivitiesTimeline(LinearLayout container, com.google.firebase.firestore.QuerySnapshot snapshots) {
+        container.removeAllViews();
+
+        for (int i = 0; i < snapshots.size(); i++) {
+            QueryDocumentSnapshot doc = (QueryDocumentSnapshot) snapshots.getDocuments().get(i);
+            String title = doc.getString("title");
+            String desc = doc.getString("desc");
+            String emoji = doc.getString("emoji");
+            Double amount = doc.getDouble("amount");
+            com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+
+            View row = LayoutInflater.from(this).inflate(R.layout.item_group_activity_timeline, container, false);
+            
+            TextView emojiTv = row.findViewById(R.id.activity_emoji);
+            TextView titleTv = row.findViewById(R.id.activity_title);
+            TextView descTv = row.findViewById(R.id.activity_desc);
+            TextView amountTv = row.findViewById(R.id.activity_amount);
+            View topConnector = row.findViewById(R.id.timeline_connector_top);
+            View bottomConnector = row.findViewById(R.id.timeline_connector_bottom);
+
+            if (emojiTv != null) emojiTv.setText(emoji != null ? emoji : "🔔");
+            if (titleTv != null) titleTv.setText(title);
+            
+            String timeStr = ts != null ? android.text.format.DateUtils.getRelativeTimeSpanString(ts.toDate().getTime()).toString() : "Just now";
+            if (descTv != null) descTv.setText((desc != null ? desc : "") + " • " + timeStr);
+
+            if (amountTv != null) {
+                if (amount != null && amount != 0) {
+                    amountTv.setVisibility(View.VISIBLE);
+                    amountTv.setText((amount > 0 ? "+" : "") + String.format(Locale.US, "$%,.2f", amount));
+                    amountTv.setTextColor(getResources().getColor(amount > 0 ? R.color.growth_green : R.color.urgency_red));
+                } else {
+                    amountTv.setVisibility(View.GONE);
+                }
+            }
+
+            // Hide connectors for first/last items
+            if (i == 0 && topConnector != null) topConnector.setVisibility(View.INVISIBLE);
+            if (i == snapshots.size() - 1 && bottomConnector != null) bottomConnector.setVisibility(View.INVISIBLE);
+
+            container.addView(row);
+        }
+    }
+
+    private void renderGroupMembersHorizontal(LinearLayout container, Map<String, String> members, Map<String, String> memberNames, boolean isAdmin) {
+        container.removeAllViews();
+        float density = getResources().getDisplayMetrics().density;
+
+        for (Map.Entry<String, String> entry : members.entrySet()) {
+            String uid = entry.getKey();
+            String role = entry.getValue();
+            String displayName = memberNames.get(uid);
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = uid.substring(0, Math.min(uid.length(), 6));
+            }
+
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(android.view.Gravity.CENTER);
+            item.setPadding(0, 0, (int)(20 * density), 0);
+
+            // Avatar Frame
+            FrameLayout frame = new FrameLayout(this);
+            frame.setLayoutParams(new LinearLayout.LayoutParams((int)(54 * density), (int)(54 * density)));
+            
+            View circle = new View(this);
+            android.graphics.drawable.GradientDrawable shape = new android.graphics.drawable.GradientDrawable();
+            shape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            shape.setColor(0xFFE8EDF2);
+            circle.setBackground(shape);
+            frame.addView(circle);
+
+            TextView initialsTv = new TextView(this);
+            initialsTv.setText(displayName.length() > 1 ? displayName.substring(0, 2).toUpperCase() : displayName.substring(0, 1).toUpperCase());
+            initialsTv.setTextColor(0xFF191C1E);
+            initialsTv.setTypeface(null, Typeface.BOLD);
+            initialsTv.setGravity(android.view.Gravity.CENTER);
+            frame.addView(initialsTv);
+
+            // Role indicator dot
+            View dot = new View(this);
+            FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams((int)(12 * density), (int)(12 * density));
+            dotParams.gravity = android.view.Gravity.BOTTOM | android.view.Gravity.END;
+            dot.setLayoutParams(dotParams);
+            android.graphics.drawable.GradientDrawable dotShape = new android.graphics.drawable.GradientDrawable();
+            dotShape.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            dotShape.setColor(role.equals("admin") ? 0xFF00993B : 0xFFBDBDBD);
+            dotShape.setStroke((int)(2*density), 0xFFFFFFFF);
+            dot.setBackground(dotShape);
+            frame.addView(dot);
+
+            item.addView(frame);
+
+            TextView nameTv = new TextView(this);
+            nameTv.setText(displayName);
+            nameTv.setTextSize(11);
+            nameTv.setTextColor(0xFF191C1E);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = (int)(8 * density);
+            nameTv.setLayoutParams(lp);
+            item.addView(nameTv);
+
+            if (isAdmin && !uid.equals(mAuth.getUid())) {
+                final String finalDisplayName = displayName;
+                item.setOnClickListener(v -> {
+                    new AlertDialog.Builder(this)
+                        .setTitle("Manage Member")
+                        .setMessage("Update role for " + finalDisplayName + "?")
+                        .setPositiveButton(role.equals("admin") ? "Make Casual" : "Make Admin", (d, w) -> {
+                            mGroupRef.update("members." + uid, role.equals("admin") ? "casual" : "admin");
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                });
+            }
+
+            container.addView(item);
+        }
+    }
+
+    private void leaveGroup() {
+        FirebaseUser user = mAuth.getCurrentUser();
+        if (user == null || mCurrentGroupId == null) return;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Leave Workspace")
+                .setMessage("Are you sure you want to disconnect from this shared stash?")
+                .setPositiveButton("Leave", (d, w) -> {
+                    mFirestore.collection("groups").document(mCurrentGroupId)
+                            .update("members." + user.getUid(), FieldValue.delete())
+                            .addOnSuccessListener(aVoid -> {
+                                mFirestore.collection("users").document(user.getUid())
+                                        .update("currentGroupId", null);
+                                mCurrentGroupId = null;
+                                mGroupRef = null;
+                                if (mGroupListener != null) mGroupListener.remove();
+                                renderGroupOnboarding();
+                            });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void provisionFirestoreDefaults() {
@@ -1389,24 +1841,48 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout currentRow = null;
         int count = 0;
 
-        List<QueryDocumentSnapshot> expiringSoon = new ArrayList<>();
+        List<Object> itemsToRender = new ArrayList<>();
+        if (snapshots != null) {
+            for (QueryDocumentSnapshot doc : snapshots) itemsToRender.add(doc);
+        } else {
+            itemsToRender.addAll(mLocalItems);
+        }
+
+        List<Object> expiringSoon = new ArrayList<>();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         Calendar threshold = Calendar.getInstance();
         threshold.add(Calendar.DAY_OF_YEAR, 2); // 48 hours
 
-        for (QueryDocumentSnapshot doc : snapshots) {
-            String name = doc.getString("name");
-            Double price = doc.getDouble("price");
-            String category = doc.getString("category");
-            String emoji = doc.getString("emoji");
-            String expDateStr = doc.getString("expiryDate");
+        for (Object itemObj : itemsToRender) {
+            String name, category, emoji, expDateStr, addedDateStr, id;
+            Double price;
+
+            if (itemObj instanceof QueryDocumentSnapshot) {
+                QueryDocumentSnapshot doc = (QueryDocumentSnapshot) itemObj;
+                id = doc.getId();
+                name = doc.getString("name");
+                price = doc.getDouble("price");
+                category = doc.getString("category");
+                emoji = doc.getString("emoji");
+                expDateStr = doc.getString("expiryDate");
+                addedDateStr = doc.getString("addedDate");
+            } else {
+                Map<String, Object> map = (Map<String, Object>) itemObj;
+                id = (String) map.get("id");
+                name = (String) map.get("name");
+                price = (Double) map.get("price");
+                category = (String) map.get("category");
+                emoji = (String) map.get("emoji");
+                expDateStr = (String) map.get("expiryDate");
+                addedDateStr = (String) map.get("addedDate");
+            }
 
             // Expiry check
             if (expDateStr != null && !expDateStr.isEmpty()) {
                 try {
                     Date expDate = sdf.parse(expDateStr);
                     if (expDate != null && expDate.before(threshold.getTime())) {
-                        expiringSoon.add(doc);
+                        expiringSoon.add(itemObj);
                     }
                 } catch (Exception ignored) {}
             }
@@ -1425,14 +1901,30 @@ public class MainActivity extends AppCompatActivity {
                 currentRow.setLayoutParams(rowParams);
                 mInventoryContainer.addView(currentRow);
             }
-            currentRow.addView(createInventoryCard(doc.getId(), name, price, category, emoji, expDateStr));
+            
+            View card = createInventoryCard(id, name, price, category, emoji, expDateStr, addedDateStr);
+            if (snapshots == null) {
+                card.setOnClickListener(v -> new AlertDialog.Builder(this)
+                    .setTitle(name)
+                    .setMessage("Remove this item from your individual stash?")
+                    .setPositiveButton("Remove", (d, w) -> {
+                        mLocalItems.remove(itemObj);
+                        mCurrentBudgetSpent -= (price != null ? price : 0.0);
+                        mActiveAssetsValue -= (price != null ? price : 0.0);
+                        renderInventoryItems(null);
+                        applyLocalMockData();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show());
+            }
+            currentRow.addView(card);
             count++;
         }
 
-        updateExpiryWidget(expiringSoon);
+        updateExpiryWidgetUnified(expiringSoon);
     }
 
-    private void updateExpiryWidget(List<QueryDocumentSnapshot> expiringItems) {
+    private void updateExpiryWidgetUnified(List<Object> expiringItems) {
         if (mExpiryContainer == null) return;
         mExpiryContainer.removeAllViews();
 
@@ -1445,9 +1937,15 @@ public class MainActivity extends AppCompatActivity {
         float density = getResources().getDisplayMetrics().density;
 
         for (int i = 0; i < expiringItems.size(); i++) {
-            QueryDocumentSnapshot item = expiringItems.get(i);
-            String name = item.getString("name");
-            String expDate = item.getString("expiryDate");
+            Object itemObj = expiringItems.get(i);
+            String name, expDate;
+            if (itemObj instanceof QueryDocumentSnapshot) {
+                name = ((QueryDocumentSnapshot) itemObj).getString("name");
+                expDate = ((QueryDocumentSnapshot) itemObj).getString("expiryDate");
+            } else {
+                name = (String) ((Map<String, Object>) itemObj).get("name");
+                expDate = (String) ((Map<String, Object>) itemObj).get("expiryDate");
+            }
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -1495,7 +1993,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private View createInventoryCard(String id, String name, Double price, String category, String emoji, String expDate) {
+    private View createInventoryCard(String id, String name, Double price, String category, String emoji, String expDate, String addedDate) {
         float density = getResources().getDisplayMetrics().density;
         LinearLayout card = new LinearLayout(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
@@ -1519,10 +2017,18 @@ public class MainActivity extends AppCompatActivity {
         card.addView(nameTv);
 
         TextView priceTv = new TextView(this);
-        priceTv.setText("$" + String.format("%.2f", price != null ? price : 0.0));
+        priceTv.setText("$" + String.format(Locale.US, "%.2f", price != null ? price : 0.0));
         priceTv.setTextColor(getResources().getColor(R.color.text_muted));
         priceTv.setTextSize(11);
         card.addView(priceTv);
+
+        if (addedDate != null && !addedDate.isEmpty()) {
+            TextView addedTv = new TextView(this);
+            addedTv.setText("Added: " + addedDate);
+            addedTv.setTextColor(getResources().getColor(R.color.text_muted));
+            addedTv.setTextSize(10);
+            card.addView(addedTv);
+        }
 
         if (expDate != null && !expDate.isEmpty()) {
             TextView expTv = new TextView(this);
@@ -1543,7 +2049,7 @@ public class MainActivity extends AppCompatActivity {
                     Map<String, Object> activity = new HashMap<>();
                     activity.put("title", name + " Removed");
                     activity.put("desc", "Item removed or consumed");
-                    activity.put("amount", price);
+                    activity.put("amount", 0.0);
                     activity.put("emoji", "✅");
                     activity.put("timestamp", FieldValue.serverTimestamp());
                     mGroupRef.collection("activities").add(activity);
@@ -1552,13 +2058,6 @@ public class MainActivity extends AppCompatActivity {
                 .show());
 
         return card;
-    }
-
-    private void syncMembersToUI() {
-        if (mMembersContainer == null) return;
-        int childCount = mMembersContainer.getChildCount();
-        if (childCount > 2) mMembersContainer.removeViews(1, childCount - 2);
-        for (String member : mMembersList) addMemberToUI(member);
     }
 
     private void updateProfileUI() {
@@ -1578,8 +2077,6 @@ public class MainActivity extends AppCompatActivity {
         if (mSettingsProfileInitials != null) mSettingsProfileInitials.setText(initials);
         if (mSettingsProfileName != null) mSettingsProfileName.setText(name);
         if (mSettingsProfileEmail != null) mSettingsProfileEmail.setText(email);
-        if (mMemberAlexInitials != null) mMemberAlexInitials.setText(initials);
-        if (mMemberAlexName != null) mMemberAlexName.setText(name);
         TextView greeting = findViewById(R.id.greeting_text);
         if (greeting != null) greeting.setText("Good morning, " + name);
     }
@@ -1587,12 +2084,13 @@ public class MainActivity extends AppCompatActivity {
     private void updateRatioBar() {
         if (mDashboardProgressContainer == null || mDashboardUtilizationLbl == null) return;
         
-        double spentRatio = (mCurrentBudgetSpent / mCurrentBudgetCap) * 100.0;
-        mDashboardUtilizationLbl.setText(String.format("%.1f%% Utilized", Math.min(100.0, spentRatio)));
+        double cap = mCurrentBudgetCap > 0 ? mCurrentBudgetCap : 1.0; // Avoid division by zero
+        double spentRatio = (mCurrentBudgetSpent / cap) * 100.0;
+        mDashboardUtilizationLbl.setText(String.format(Locale.US, "%.1f%% Utilized", Math.min(100.0, spentRatio)));
 
-        double reservedRatio = (mBudgetReserved / mCurrentBudgetCap) * 100.0;
+        double reservedRatio = (mBudgetReserved / cap) * 100.0;
         if (mDashboardAllocatedLbl != null) {
-            mDashboardAllocatedLbl.setText(String.format("%.1f%% Allocated", Math.min(100.0, reservedRatio)));
+            mDashboardAllocatedLbl.setText(String.format(Locale.US, "%.1f%% Allocated", Math.min(100.0, reservedRatio)));
         }
 
         mDashboardProgressContainer.post(() -> {
@@ -1600,24 +2098,30 @@ public class MainActivity extends AppCompatActivity {
                 mDashboardProgressContainer.removeAllViews();
                 
                 // 1. Add Allocations from the left
-                for (int i = 0; i < mAllocationsList.size(); i++) {
-                    Map<String, Object> alloc = mAllocationsList.get(i);
+                for (int k = 0; k < mAllocationsList.size(); k++) {
+                    Map<String, Object> alloc = mAllocationsList.get(k);
                     Double amount = 0.0;
                     if (alloc.get("amount") instanceof Double) amount = (Double) alloc.get("amount");
                     else if (alloc.get("amount") instanceof Long) amount = ((Long) alloc.get("amount")).doubleValue();
                     
-                    if (amount <= 0) continue;
+                    if (amount == null || amount <= 0) continue;
                     
-                    float weight = (float) (amount / mCurrentBudgetCap);
+                    float weight = (float) (amount / cap);
                     View segment = new View(this);
                     segment.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight));
-                    segment.setBackgroundColor(ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]);
+                    segment.setBackgroundColor(ALLOCATION_COLORS[k % ALLOCATION_COLORS.length]);
+                    
+                    final int index = k;
+                    final String title = (String) alloc.get("title");
+                    final double finalAmount = amount;
+                    segment.setOnClickListener(v -> showEditAllocationDialog(index, title, finalAmount));
+
                     mDashboardProgressContainer.addView(segment);
                 }
                 
                 // 2. Add Spent part
                 if (mCurrentBudgetSpent > 0) {
-                    float spentWeight = (float) (mCurrentBudgetSpent / mCurrentBudgetCap);
+                    float spentWeight = (float) (mCurrentBudgetSpent / cap);
                     View spentSegment = new View(this);
                     spentSegment.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, spentWeight));
                     

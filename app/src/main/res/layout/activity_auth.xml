@@ -155,21 +155,12 @@
                 android:layout_height="52dp"
                 android:background="@drawable/btn_dark_rounded"
                 app:backgroundTint="@color/primary"
-                android:text="⚡ Guest Quick Login"
+                android:text="Guest Mode"
                 android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:textSize="15sp"
                 android:textStyle="bold"
                 android:layout_marginHorizontal="4dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Sign in instantly using our pre-configured evaluation account"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:layout_marginTop="8dp"
-                android:textAlignment="center" />
 
         </LinearLayout>
     </ScrollView>
